@@ -16,7 +16,7 @@ interface Diagnostics {
   home: string;
   /** 实际 Webview 可见状态及前端回传的渲染确认。 */
   dashboardVisible: boolean;
-  dashboardRender?: { locale: string; sessions: number; usageRange?: string; output?: number };
+  dashboardRender?: { locale: string; sessions: number; usageRange?: string; output?: number; estimatedBuckets?: number; measuredBuckets?: number };
 }
 
 /** 等待异步状态栏刷新，在限定时间内失败而不是永久阻塞。 */
@@ -90,9 +90,11 @@ export async function run(): Promise<void> {
     await fs.appendFile(file, row(now, 'event_msg', { type: 'task_started' }) + '\n');
     const estimated = await waitFor(d => d.state?.snapshot.kind === 'estimated');
     assert.match(estimated.text, /~/);
+    await waitFor(d => (d.dashboardRender?.estimatedBuckets ?? 0) > 0 && (d.dashboardRender?.measuredBuckets ?? 0) > 0);
     await vscode.workspace.getConfiguration('codexSpeed').update('showEstimates', false, vscode.ConfigurationTarget.Global);
     const waiting = await waitFor(d => d.state?.snapshot.kind === 'waiting');
     assert.ok(waiting.text.includes(chinese ? traditional ? '等待計數' : '等待计数' : 'Waiting for counts'));
+    await waitFor(d => d.dashboardRender?.estimatedBuckets === 0 && (d.dashboardRender.measuredBuckets ?? 0) > 0);
     // 在仍有计数的同一会话内覆盖和恢复语言，确认立即生效且不丢失测速状态。
     for (const [selected, expected] of [['zh-cn', '等待计数'], ['zh-tw', '等待計數'], ['en', 'Waiting for counts'], ['auto', chinese ? traditional ? '等待計數' : '等待计数' : 'Waiting for counts']]) {
       await vscode.workspace.getConfiguration('codexSpeed').update('language', selected, vscode.ConfigurationTarget.Global);
@@ -105,7 +107,7 @@ export async function run(): Promise<void> {
     now = Date.now();
     await fs.appendFile(file, row(now, 'token_usage_record', { response_id: 'two', usage: { output_tokens: 120 } }) + '\n' + row(now + 1, 'event_msg', { type: 'task_complete' }) + '\n');
     await waitFor(d => d.state?.snapshot.output === 420);
-    const empty = { snapshot: { rate: 0, kind: 'idle' as const, active: 0, sessions: 0, responses: 0, output: 0, latest: undefined }, notice: '', error: true, limited: false };
+    const empty = { snapshot: { rate: 0, measuredRate: 0, estimatedRate: 0, estimatedShare: 0, kind: 'idle' as const, active: 0, sessions: 0, responses: 0, output: 0, latest: undefined }, notice: '', error: true, limited: false };
     assert.match(statusText(empty), /warning/);
     await vscode.workspace.getConfiguration('codexSpeed').update('codexHome', path.join(home, 'missing'), vscode.ConfigurationTarget.Global);
     const missing = await waitFor(d => d.state?.error === true);

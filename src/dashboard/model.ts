@@ -1,17 +1,7 @@
 import path from 'node:path';
-import { calculate, inWorkspace, measured } from '../engine';
+import { calculateFrame, inWorkspace, measured, sampleDuration, SpeedPoint } from '../engine';
 import { MonitorOptions, Sample, Session, Snapshot } from '../types';
 import { HistoryStatus, UsageRange, UsageSummary } from '../history/types';
-
-/** 曲线采样点；估算与实测保持不同来源，不能将上次调用当作实时曲线。 */
-export interface SpeedPoint {
-  /** 扩展宿主采样时刻。 */
-  time: number;
-  /** 当前输出速度；空闲、等待及工具阶段没有窗口内输出时为零。 */
-  rate: number;
-  /** 数字的来源。 */
-  kind: Snapshot['kind'];
-}
 
 /** 单个会话的计数摘要，仅传递元数据，不传递对话正文。 */
 export interface SessionSummary {
@@ -29,6 +19,8 @@ export interface SessionSummary {
   rate: number;
   /** 估算结果需要明确标识，不回填历史调用速度。 */
   kind: Snapshot['kind'];
+  /** 会话当前速率中的估算占比。 */
+  estimatedShare: number;
   /** 最近半小时去重后的输出量。 */
   output: number;
   /** 最近半小时去重后的输入量。 */
@@ -39,13 +31,13 @@ export interface SessionSummary {
   lastEvent: number;
 }
 
-/** 仪表盘唯一数据结构；所有统计窗口均明确限制为可用的近半小时记录。 */
+/** 仪表盘唯一数据结构；每秒重建测速曲线与所选历史用量窗口分别计算。 */
 export interface DashboardData {
   /** 本次快照的宿主时间。 */
   now: number;
   /** 当前测速快照。 */
   snapshot: Snapshot;
-  /** 最近五分钟的有界采样；关闭面板时仍由已有状态栏轮询积累。 */
+  /** 最近三百个一秒桶，实测与估算部分独立并可在完成后校正。 */
   points: SpeedPoint[];
   /** 过滤和合并后的会话列表。 */
   sessions: SessionSummary[];
@@ -55,23 +47,11 @@ export interface DashboardData {
   history: HistoryStatus;
 }
 
-/** 只积累小型速度采样，不另开日志扫描、模型请求或计时器。 */
+/** 从已有解析结果重建三百秒曲线，不另开日志扫描、模型请求或计时器。 */
 export class DashboardHistory {
-  /** 半秒粒度最多保留五分钟，另限制数量防止频繁手动刷新增长。 */
-  private points: SpeedPoint[] = [];
-
-  /** 保存当前真实监控状态；同一个半秒内的重复刷新覆盖最后一点。 */
-  record(snapshot: Snapshot, now: number, error = false): void {
-    let last = this.points.at(-1);
-    if (last && now < last.time) { this.points = []; last = undefined; }
-    const point = { time: now, rate: !error && ['measured', 'estimated'].includes(snapshot.kind) ? snapshot.rate : 0, kind: snapshot.kind };
-    if (last && Math.floor(now / 500) === Math.floor(last.time / 500)) this.points[this.points.length - 1] = point;
-    else this.points.push(point);
-    this.points = this.points.filter(item => item.time >= now - 300000).slice(-601);
-  }
-
   /** 只有面板可见时构造会话及用量，常规状态栏轮询不重复汇总。 */
   data(sessions: Session[], options: MonitorOptions, snapshot: Snapshot, now: number, historical?: UsageSummary, status?: HistoryStatus): DashboardData {
+    const frame = calculateFrame(sessions, options, now, true);
     const selected = sessions.filter(session => options.scope === 'all' || inWorkspace(session.cwd, options.workspaces));
     const grouped = new Map<string, Session[]>();
     for (const session of selected) grouped.set(session.id, [...(grouped.get(session.id) ?? []), session]);
@@ -88,22 +68,25 @@ export class DashboardHistory {
         }
       }
       const active = current.lastEvent >= now - 300000 && current.lastEvent <= now;
-      const rate = calculate(group, { ...options, scope: 'all' }, now);
+      const rate = frame.agents.get(id)!;
       rows.push({ id, name: path.basename(current.cwd.replace(/\\/g, '/')) || '', cwd: current.cwd,
         model: current.model === '未知模型' ? '' : current.model, phase: active ? current.phase : 'idle',
-        rate: rate.rate, kind: rate.kind, input: [...own.values()].reduce((sum, sample) => sum + sample.input, 0),
+        rate: rate.rate, kind: rate.kind, estimatedShare: rate.estimatedShare, input: [...own.values()].reduce((sum, sample) => sum + sample.input, 0),
         output: rate.output, responses: rate.responses, lastEvent: current.lastEvent });
       const totals = historical?.bySession.get(id);
       if (historical) Object.assign(rows.at(-1)!, totals ?? { input: 0, output: 0, responses: 0 });
     }
     const samples = [...unique.values()];
     const timed = samples.filter(measured);
-    const duration = timed.reduce((sum, sample) => sum + sample.end - sample.start, 0);
-    const points = this.points.filter(point => point.time >= now - 300000 && point.time <= now);
+    const duration = timed.reduce((sum, sample) => sum + sampleDuration(sample), 0);
+    const points = frame.points;
+    // 峰值采用每秒桶的三秒平均，并包含当前窗口读数，估算会随完成记录一起校正。
+    let previous1 = 0, previous2 = 0, peak = snapshot.rate;
+    for (const point of points) { peak = Math.max(peak, (previous2 + previous1 + point.rate) / 3); previous2 = previous1; previous1 = point.rate; }
     return { now, snapshot, points, sessions: rows.sort((a, b) => Number(b.phase !== 'idle') - Number(a.phase !== 'idle') || b.lastEvent - a.lastEvent),
       usage: { input: historical?.input ?? samples.reduce((sum, sample) => sum + sample.input, 0), output: historical?.output ?? samples.reduce((sum, sample) => sum + sample.output, 0),
         responses: historical?.responses ?? samples.length, average: historical?.average ?? (duration ? timed.reduce((sum, sample) => sum + sample.output, 0) * 1000 / duration : 0),
-        peak: points.reduce((peak, point) => Math.max(peak, point.rate), 0), range: historical?.range ?? '30m', from: historical?.from ?? now - 1800000, timeZone: historical?.timeZone ?? 'UTC' },
+        peak, range: historical?.range ?? '30m', from: historical?.from ?? now - 1800000, timeZone: historical?.timeZone ?? 'UTC' },
       history: status ?? { indexing: false, scanned: 0, total: 0, limited: false, readErrors: 0, cacheError: false, cacheReset: false, follower: false } };
   }
 }

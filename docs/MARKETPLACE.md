@@ -27,7 +27,9 @@ Codex 0.0 tok/s          无当前输出 / No current output
 
 ### 仪表盘
 
-悬停显示简洁摘要，点击状态栏打开完整仪表盘。曲线从本次监控启动后开始积累，实线为实测，虚线包含估算。用量支持近 30 分钟、今天、近 7 天和近 30 天，默认“今天”，按 VS Code 客户端时区划分。近 7／30 天为滚动小时窗口。输入可能含缓存 token，平均速度使用耗时已知的已完成调用；五分钟峰值仍来自实时采样，可能包含估算。
+悬停显示简洁摘要，点击状态栏打开完整仪表盘。核心测速采用与 Agent Speed 相同的 Codex 口径：三秒窗口合计实测与在途估算；完成计数到达后按调用区间重建历史，替换此前估算。曲线为最近三百个一秒桶，蓝线是实测部分，蓝绿色虚线为含估算的合计；悬停或方向键可查看每秒组成与占比。主读数是三秒平均，不必与某个一秒值完全相等。
+
+用量支持近 30 分钟、今天、近 7 天和近 30 天，默认“今天”，按客户端时区划分。近 7／30 天是滚动小时窗口。输入可能含缓存 token，平均速度取耗时已知的完成调用；五分钟监测峰值可能含估算，并会随曲线重建而校正。
 
 首次使用会分批索引历史，显示进度及不完整提示。缓存保存计数与读取断点，重启后继续增量读取；只支持 `sessions` 目录下近 30 天内更新的未压缩 JSONL。缓存文件保存在扩展存储目录，Codex 日志保持只读。
 
@@ -39,7 +41,7 @@ Codex 0.0 tok/s          无当前输出 / No current output
 2. 使用 Remote SSH 时，确认它安装在 **SSH: 服务器名** 一侧。
 3. 在同一台主机上，以同一用户运行 Codex。状态栏会自动出现速度读数。
 
-默认读取 `CODEX_HOME`，未设置时使用 `~/.codex`。新会话通常在约五秒内被发现，之后默认每秒刷新。
+默认读取 `CODEX_HOME`，未设置时使用 `~/.codex`。新会话通常在约五秒内被发现，之后默认每半秒刷新。
 
 如果使用独立的 Codex 数据目录，请在 VS Code 的**用户或远程设置**中填写包含 `sessions` 子目录的路径：
 
@@ -59,7 +61,7 @@ Codex 0.0 tok/s          无当前输出 / No current output
 | `0.0 tok/s` | 三秒窗口已无输出；上次调用速度与时间在仪表盘单独展示 |
 | `工具中` / `0.0 tok/s` | 等待工具结果，或当前空闲 |
 
-**生成中的 `~` 是估算，不是逐 token 的实时计数。** Codex 写入完成记录后，插件再用实际 token 数和日志时间更新。速度包含首 token 等待时间，输出计数包含 reasoning，不能直接与模型服务器的纯解码速度比较。
+**`~` 表示包含估算，并非逐 token 遥测。** 完成记录按响应耗时均匀重建历史，因此校正后的实线也可能呈水平。工具中仍有刚完成响应的三秒窗口贡献可以正常出现；窗口排空后归零。速度含首 token 等待，输出含 reasoning。
 
 默认统计此主机的全部近期会话，所以当前聊天停下来时，其他会话仍可能贡献速度。如果缺少结束事件，生成估算可能持续到最近一条日志后的五分钟。
 
@@ -71,7 +73,7 @@ Codex 0.0 tok/s          无当前输出 / No current output
 | `codexSpeed.language` | `auto` | 跟随 VS Code，或手动选择 `en`、`zh-cn`、`zh-tw`，立即生效 |
 | `codexSpeed.scope` | `all` | 改为 `workspace`，仅查看当前工作区中的会话 |
 | `codexSpeed.showEstimates` | `true` | 改为 `false`，生成中等待完成记录再显示实测结果 |
-| `codexSpeed.pollIntervalMs` | `1000` | 刷新间隔（毫秒）；可调为 `3000`，降低轮询频率 |
+| `codexSpeed.pollIntervalMs` | `500` | 刷新间隔（毫秒）；可调为 `3000`，降低轮询频率 |
 | `codexSpeed.enabled` | `true` | 开启或停止监控 |
 
 ### 看不到速度时
@@ -99,7 +101,9 @@ Set `codexSpeed.language` to `auto` (default), `en`, `zh-cn` or `zh-tw` in User 
 
 ### Dashboard
 
-Hover for a compact summary, or click the status item to open the full dashboard. Speed history accumulates while monitoring; solid segments are measured and dashed segments include estimates. Usage supports the last 30 minutes, today, the last 7 days and the last 30 days. Today is the default and uses the VS Code client’s time zone; 7/30-day periods use rolling hours. Input may include cached tokens; average speed uses completed calls with known duration. The peak can include estimates.
+Hover for a compact summary, or click to open the dashboard. Core Codex speed follows Agent Speed's rules: a three-second window combines measured records and in-flight estimates. Completed usage reconstructs its interval and replaces the earlier estimate. The chart has 300 one-second buckets: blue for measured components, teal dashed totals when estimates contribute. Hover or use arrow keys to inspect each second. A one-second chart value need not equal the three-second main reading.
+
+Usage supports the last 30 minutes, today, the last 7 days and the last 30 days. Today follows the client time zone; 7/30-day periods use rolling hours. Input may include cached tokens; averages use timed completed calls. The five-minute monitored peak can include estimates and is corrected with reconstructed history.
 
 The console uses blue measured lines and teal estimate lines. Wide windows show the reading beside its trend, a horizontal usage strip and a session table; narrow windows use compact cards. Language, rescan and Settings are in the toolbar, with connection metadata in expandable details. Closing the dashboard keeps the existing status-bar sampling active, without another scanning timer. Cost and network traffic tracking are not included.
 
@@ -109,7 +113,7 @@ The console uses blue measured lines and teal estimate lines. Wide windows show 
 2. In a Remote SSH window, confirm installation on **SSH: your-server**.
 3. Run Codex on that host as the same user. The status item appears automatically.
 
-The extension uses `CODEX_HOME`, falling back to `~/.codex`. New sessions are normally discovered within about five seconds, followed by one-second polling by default.
+The extension uses `CODEX_HOME`, falling back to `~/.codex`. New sessions are normally discovered within about five seconds, followed by half-second polling by default.
 
 For a custom data directory, set `codexSpeed.codexHome` in VS Code **User or Remote settings** to the directory containing `sessions`, for example `/home/your-user/.codex`.
 
@@ -123,7 +127,7 @@ For a custom data directory, set `codexSpeed.codexHome` in VS Code **User or Rem
 | `0.0 tok/s` | No current output in the three-second window; last-call rate and time appear separately in the dashboard |
 | `Tools` / `0.0 tok/s` | Waiting for tool results, or idle |
 
-**A rate marked with `~` is an estimate, not token-by-token telemetry.** Completed Codex records update it using actual counts and log timestamps. Duration includes time to first token; output includes reasoning. This differs from a model server's internal decoding rate.
+**`~` means estimates contribute; it is not per-token telemetry.** Completed records distribute output uniformly over their response intervals, so corrected measured lines can be flat. A tools phase can still show a just-completed response's contribution to the three-second window; it returns to zero when the window empties. Duration includes time to first token; output includes reasoning.
 
 The default host-wide scope includes other sessions, even when the chat you are viewing has stopped. Missing completion events can leave generation estimates active until five minutes after the latest log event.
 
@@ -137,7 +141,7 @@ Historical usage is indexed in batches from uncompressed JSONL files under `sess
 | `codexSpeed.language` | `auto` | Follow VS Code or manually select `en`, `zh-cn` or `zh-tw`; applies immediately |
 | `codexSpeed.scope` | `all` | Use `workspace` to include only sessions inside the current workspace folders |
 | `codexSpeed.showEstimates` | `true` | Set to `false` to wait for completed usage records rather than show generation estimates |
-| `codexSpeed.pollIntervalMs` | `1000` | Poll interval in milliseconds; use `3000` for less frequent polling |
+| `codexSpeed.pollIntervalMs` | `500` | Poll interval in milliseconds; use `3000` for less frequent polling |
 | `codexSpeed.enabled` | `true` | Start or stop monitoring |
 
 ### Troubleshooting

@@ -1,4 +1,4 @@
-import { inWorkspace, measured } from '../engine';
+import { inWorkspace, measured, sampleDuration } from '../engine';
 import { MonitorOptions } from '../types';
 import { UsageRange, UsageRecord, UsageSummary } from './types';
 
@@ -40,7 +40,7 @@ export function summarize(records: Iterable<UsageRecord>, range: UsageRange, tim
   let input = 0, output = 0, timedOutput = 0, duration = 0;
   for (const record of unique.values()) {
     input += record.input; output += record.output;
-    if (measured(record)) { duration += record.end - record.start; timedOutput += record.output; }
+    if (measured(record)) { duration += sampleDuration(record); timedOutput += record.output; }
     const totals = bySession.get(record.session) ?? { input: 0, output: 0, responses: 0 };
     totals.input += record.input; totals.output += record.output; totals.responses++; bySession.set(record.session, totals);
   }

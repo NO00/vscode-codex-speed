@@ -4,6 +4,8 @@
   const saved = api.getState();
   let range = [60, 120, 300].includes(saved?.range) ? saved.range : 60;
   let latest;
+  /** 悬停时间在每秒重绘后保留，完成记录校正时可直接看到该秒的新组成。 */
+  let hoverTime;
   const namespace = 'http://www.w3.org/2000/svg';
   /** 仅使用纯文本写入用户目录、模型和翻译，避免日志字段成为可执行 HTML。 */
   function text(id, value) { document.getElementById(id).textContent = value; }
@@ -18,7 +20,7 @@
   function number(value, compact = false) {
     return new Intl.NumberFormat(latest.locale, { notation: compact ? 'compact' : 'standard', maximumFractionDigits: compact ? 1 : 0 }).format(value);
   }
-  /** 根据当前时间窗口绘图；断档留空，估算段使用虚线，绝不补造离线历史。 */
+  /** 绘制重建后的一秒桶：蓝线是实测部分，蓝绿虚线是含估算的合计。 */
   function drawChart() {
     const { data, labels } = latest;
     const chart = document.getElementById('chart');
@@ -50,18 +52,37 @@
       else segment.push(point);
     }
     for (const segment of segments) if (segment.length > 1) {
-      const area = `M${x(segment[0])},${bottom} ` + segment.map(point => `L${x(point)},${y(point)}`).join(' ') + ` L${x(segment.at(-1))},${bottom} Z`;
+      const area = `M${x(segment[0])},${bottom} ` + segment.map(point => `L${x(point)},${y({ rate: point.measured })}`).join(' ') + ` L${x(segment.at(-1))},${bottom} Z`;
       chart.append(svg('path', { d: area, fill: 'url(#trend-fill)' }));
     }
     for (let index = 1; index < points.length; index++) {
       const previous = points[index - 1], point = points[index];
       if (point.time - previous.time > 15000) continue;
-      chart.append(svg('path', { d: `M${x(previous)},${y(previous)} L${x(point)},${y(point)}`, class: `speed-line${point.kind === 'estimated' || previous.kind === 'estimated' ? ' estimated' : ''}` }));
+      chart.append(svg('path', { d: `M${x(previous)},${y({ rate: previous.measured })} L${x(point)},${y({ rate: point.measured })}`, class: 'speed-line' }));
+      if (point.estimated > 0 || previous.estimated > 0) chart.append(svg('path', { d: `M${x(previous)},${y(previous)} L${x(point)},${y(point)}`, class: 'speed-line estimated' }));
     }
     if (points.length) {
       const point = points[points.length - 1];
-      chart.append(svg('circle', { cx: x(point), cy: y(point), r: 3, fill: point.kind === 'estimated' ? 'var(--estimate)' : 'var(--accent)' }));
+      chart.append(svg('circle', { cx: x(point), cy: y(point), r: 3, fill: point.estimated > 0 ? 'var(--estimate)' : 'var(--accent)' }));
     }
+    // 悬浮与键盘读数直接查询当前重建的桶，不缓存已经失效的估算值。
+    const cursor = svg('g', { visibility: 'hidden', class: 'chart-cursor', 'pointer-events': 'none' });
+    chart.append(cursor); chart.setAttribute('tabindex', '0');
+    function inspect(time) {
+      if (!points.length) return;
+      const point = points.reduce((best, candidate) => Math.abs(candidate.time - time) < Math.abs(best.time - time) ? candidate : best, points[0]);
+      hoverTime = point.time;
+      const center = x(point), boxWidth = Math.min(180, right - left), boxX = Math.max(left, Math.min(right - boxWidth, center + 8));
+      const lines = [new Date(point.time).toLocaleTimeString(latest.locale, { hour12: false }), `${point.rate.toFixed(1)} tok/s`, `${labels.measured}: ${point.measured.toFixed(1)}`, `${labels.estimated}: ${point.estimated.toFixed(1)} (${point.rate ? Math.round(point.estimated * 100 / point.rate) : 0}%)`];
+      cursor.replaceChildren(svg('line', { x1: center, y1: top, x2: center, y2: bottom, class: 'cursor-line' }), svg('circle', { cx: center, cy: y(point), r: 4, class: 'cursor-dot' }), svg('rect', { x: boxX, y: top + 3, width: boxWidth, height: 64, rx: 4, class: 'cursor-box' }));
+      lines.forEach((line, index) => cursor.append(svg('text', { x: boxX + 8, y: top + 16 + index * 13, class: 'cursor-text' }, line)));
+      cursor.setAttribute('visibility', 'visible');
+    }
+    chart.onpointermove = event => { const bounds = chart.getBoundingClientRect(); inspect(start + Math.max(0, Math.min(1, ((event.clientX - bounds.left) * width / bounds.width - left) / (right - left))) * range * 1000); };
+    chart.onpointerleave = () => { hoverTime = undefined; cursor.setAttribute('visibility', 'hidden'); };
+    chart.onkeydown = event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { event.preventDefault(); inspect(event.key === 'Home' ? start : event.key === 'End' ? data.now : (hoverTime ?? data.now) + (event.key === 'ArrowLeft' ? -1000 : 1000)); } };
+    chart.onblur = () => { hoverTime = undefined; cursor.setAttribute('visibility', 'hidden'); };
+    if (hoverTime !== undefined && hoverTime >= start) inspect(hoverTime);
     document.getElementById('chart-empty').hidden = points.length >= 2;
     text('chart-empty', labels.collecting);
     for (const button of document.querySelectorAll('[data-range]')) {
@@ -109,7 +130,7 @@
     latest = payload;
     const { data, labels, context } = payload, snapshot = data.snapshot;
     document.documentElement.lang = payload.locale;
-    const mapping = { 'dashboard-title': 'console', 'live-label': 'live', 'curve-title': 'curve', 'range-60': 'oneMinute', 'range-120': 'twoMinutes', 'range-300': 'fiveMinutes', 'measured-label': 'measured', 'estimated-label': 'estimated', 'curve-note': 'curveNote', 'source-note': 'sourceNote', 'sessions-title': 'sessions', 'usage-title': 'usage', 'output-label': 'output', 'input-label': 'input', 'responses-label': 'responses', 'average-label': 'average', 'peak-label': 'peak', 'usage-note': 'usageNote', 'host-label': 'host', 'directory-label': 'directory', 'scope-label': 'scope', 'language-label': 'language', 'language-auto': 'auto', 'estimate-note': 'estimateNote', 'last-note': 'lastNote', 'stale-note': 'stale', 'privacy-note': 'noCosts', 'connection-title': 'connection', 'session-name-heading': 'sessions', 'session-model-heading': 'model', 'session-output-heading': 'output', 'session-rate-heading': 'rate', 'timezone-label': 'timeZone' };
+    const mapping = { 'dashboard-title': 'console', 'live-label': 'live', 'curve-title': 'curve', 'range-60': 'oneMinute', 'range-120': 'twoMinutes', 'range-300': 'fiveMinutes', 'measured-label': 'measuredPart', 'estimated-label': 'combined', 'curve-note': 'curveNote', 'source-note': 'sourceNote', 'sessions-title': 'sessions', 'usage-title': 'usage', 'output-label': 'output', 'input-label': 'input', 'responses-label': 'responses', 'average-label': 'average', 'peak-label': 'peak', 'usage-note': 'usageNote', 'host-label': 'host', 'directory-label': 'directory', 'scope-label': 'scope', 'language-label': 'language', 'language-auto': 'auto', 'estimate-note': 'estimateNote', 'last-note': 'lastNote', 'stale-note': 'stale', 'privacy-note': 'noCosts', 'connection-title': 'connection', 'session-name-heading': 'sessions', 'session-model-heading': 'model', 'session-output-heading': 'output', 'session-rate-heading': 'rate', 'timezone-label': 'timeZone' };
     for (const [id, key] of Object.entries(mapping)) text(id, labels[key]);
     for (const [value, key] of [['30m', 'last30m'], ['today', 'today'], ['7d', 'last7d'], ['30d', 'last30d']]) text(`usage-${value}`, labels[key]);
     const period = document.getElementById('usage-range');
@@ -130,6 +151,8 @@
     text('phase', !context.enabled ? labels.disabled : labels[phase]);
     document.getElementById('phase-dot').className = `dot ${phase === 'tools' ? 'tools' : ['idle', 'error'].includes(phase) ? 'idle' : ''}`;
     text('activity', `${labels.generating} ${number(snapshot.active)} · ${labels.tools} ${number(data.sessions.filter(session => session.phase === 'tools').length)}`);
+    text('estimate-breakdown', `${labels.measured}: ${snapshot.measuredRate.toFixed(1)} · ${labels.estimated}: ${snapshot.estimatedRate.toFixed(1)} tok/s · ${labels.estimateShare} ${Math.round(snapshot.estimatedShare * 100)}%`);
+    document.getElementById('estimate-breakdown').hidden = snapshot.estimatedRate <= 0 || !context.enabled || context.error;
     const notice = [!context.enabled ? labels.disabled : context.notice, context.limited ? labels.partial : ''].filter(Boolean).join(' ');
     text('notice', notice); document.getElementById('notice').hidden = !notice; document.getElementById('notice').classList.toggle('error', context.error);
     for (const key of ['output', 'input', 'responses']) { text(`${key}-value`, number(data.usage[key], true)); document.getElementById(`${key}-value`).title = number(data.usage[key]); }
@@ -138,13 +161,13 @@
     text('updated', `${labels.updated} ${new Date(data.now).toLocaleTimeString(payload.locale, { hour12: false })}`);
     // 上次调用独立展示并附时间，不参与当前读数或曲线；缺失耗时不得编造速度。
     const last = snapshot.latest;
-    const hasLast = last && last.start !== undefined && last.end > last.start && last.end <= data.now;
-    text('last-note', hasLast ? `${labels.lastNote}: ${(last.output * 1000 / (last.end - last.start)).toFixed(1)} tok/s · ${new Date(last.end).toLocaleTimeString(payload.locale, { hour12: false })}` : '');
+    const hasLast = last && last.start !== undefined && last.end >= last.start && last.end <= data.now;
+    text('last-note', hasLast ? `${labels.lastNote}: ${(last.output * 1000 / Math.max(500, last.end - last.start)).toFixed(1)} tok/s · ${new Date(last.end).toLocaleTimeString(payload.locale, { hour12: false })}` : '');
     document.getElementById('last-note').hidden = !hasLast || !context.enabled || context.error;
     document.getElementById('language').value = payload.selectedLanguage;
     drawChart(); drawSessions();
     // 只用于宿主确认脚本收到并绘制了真实数据，不回传路径、模型或会话内容。
-    api.postMessage({ type: 'rendered', locale: payload.locale, sessions: data.sessions.length, usageRange: data.usage.range, output: data.usage.output });
+    api.postMessage({ type: 'rendered', locale: payload.locale, sessions: data.sessions.length, usageRange: data.usage.range, output: data.usage.output, estimatedBuckets: data.points.filter(point => point.estimated > .000001).length, measuredBuckets: data.points.filter(point => point.measured > .000001).length });
   }
   for (const button of document.querySelectorAll('[data-range]')) button.addEventListener('click', () => {
     range = Number(button.dataset.range); api.setState({ range }); if (latest) drawChart();

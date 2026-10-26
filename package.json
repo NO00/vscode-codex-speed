@@ -2,7 +2,7 @@
   "name": "vscode-codex-speed",
   "displayName": "VSCode Codex Speed",
   "description": "%extension.description%",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "publisher": "NO00",
   "icon": "assets/icon.png",
   "galleryBanner": {
@@ -114,7 +114,7 @@
         },
         "codexSpeed.pollIntervalMs": {
           "type": "integer",
-          "default": 1000,
+          "default": 500,
           "minimum": 500,
           "maximum": 10000,
           "description": "%config.pollIntervalMs%",

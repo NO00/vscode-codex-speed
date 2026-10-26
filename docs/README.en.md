@@ -10,13 +10,15 @@ The extension runs as a `workspace` extension. In a remote window, it reads Code
 
 > This is an independent extension, not an official OpenAI extension or part of Agent Speed.
 
-## Monitoring console (0.1.7)
+## Monitoring console (0.1.8)
 
 Hover over the status item for a compact summary. Click it, or run **Codex Speed: Open Dashboard**, to open the dashboard beside your editor. It includes a digital speed readout, measured/estimated state, 1/2/5-minute charts, session/model/phase summaries, and usage statistics for the last 30 minutes, today, the last 7 days or the last 30 days. Today is the default and follows the dashboard client’s time zone; 7/30-day windows are rolling 7/30 × 24 hours. The toolbar contains language selection, rescan and Settings. Connection metadata, including the client time zone, is available in an expandable details section.
 
 The console uses blue for measured speed and teal for estimates. Wide windows place the live reading beside the trend chart, show usage in a horizontal strip, and align sessions in a table with short IDs. Narrow windows switch to compact cards. The circular gauge has been removed.
 
-The chart records while monitoring and retains five minutes in memory. Dashed segments include estimates; the main readout, session rates and chart use the same three-second window and return to zero without current output or an estimate. The last completed call is shown separately with its rate and time. No history is invented for time before monitoring began. Changing log directories, scope, or restarting monitoring resets the chart; switching language does not. Closing the dashboard leaves status-bar sampling active, while hidden dashboards skip detailed aggregation.
+The chart rebuilds 300 one-second buckets from available parsed records. Completed usage reconstructs the response interval and replaces its in-flight estimate. Blue shows the measured component; teal dashed segments show totals that include estimates. Hover, or focus the chart and use arrow keys, to inspect time, measured output, estimates and their share. Startup, late records and reopening can reconstruct recent history from available logs. The main readout is a three-second average, whereas the chart has one-second values; the current unfinished second only contains its covered portion. The last completed call stays separate from the live reading.
+
+Core Codex speed rules follow Agent Speed: intervals use a 500 ms minimum and exclude unknown, reversed or over-15-minute timings. In-flight references use up to three measured calls from the same session in ten minutes, falling back to up to ten same-model or same-source calls in thirty minutes. References respect the selected scope. Disabling `showEstimates` leaves measured components only. Default refresh is 500 ms; explicitly configured intervals remain effective. Hidden dashboards skip chart reconstruction and detailed aggregation.
 
 Input counts may include cached tokens. Average speed is weighted by completed request duration and excludes responses with unknown duration. The five-minute peak can include estimates. Usage history is indexed incrementally from the beginning of uncompressed JSONL files under `sessions` modified within the last 30 days, then cached in extension storage. Cursor and counters are saved together; restarts resume from committed line boundaries. Existing Codex logs remain read-only. Counts already cached from deleted logs remain until the 30-day retention window expires; a damaged cache can only be rebuilt from logs that still exist.
 
@@ -35,7 +37,7 @@ Command Palette titles and Settings descriptions always follow the VS Code displ
 ## Install in a Remote SSH window
 
 1. Connect to your server using **Remote - SSH** and open a remote folder.
-2. Open the Command Palette and run **Extensions: Install from VSIX...**. Select `vscode-codex-speed-0.1.7.vsix`.
+2. Open the Command Palette and run **Extensions: Install from VSIX...**. Select `vscode-codex-speed-0.1.8.vsix`.
 3. Confirm that **VSCode Codex Speed** appears under **SSH: your-server — Installed** in the Extensions view. If it is installed only locally, select **Install in SSH: your-server**. Run **Developer: Reload Window** if needed.
 4. Run Codex on the server as the same user. The status bar will show `Codex … tok/s`. New sessions are normally discovered within about five seconds, and existing logs are polled every second by default. Click the item to open the dashboard, whose toolbar offers rescanning and Settings.
 
@@ -53,7 +55,7 @@ In your Remote SSH window, add this to **Remote Settings (JSON)**:
 {
   "codexSpeed.codexHome": "/home/your-user/.codex",
   "codexSpeed.scope": "all",
-  "codexSpeed.pollIntervalMs": 1000,
+  "codexSpeed.pollIntervalMs": 500,
   "codexSpeed.showEstimates": true
 }
 ```
@@ -81,7 +83,7 @@ The examples below show the English UI. Chinese labels are used when that langua
 
 When multiple sessions are generating, the item includes `· N agents`. The suffix `· Partial` means a scan limit was reached and the displayed data is partial.
 
-**The logs do not provide token-by-token live counts.** Here, “live” means continuous monitoring and display updates. During generation, `~` marks an estimate based on previous measured speeds. Completed usage records replace that estimate with a rate derived from token counts and log timestamps. An estimated value is not a count of tokens actually produced in the current second. Disable `showEstimates` to wait for measured results instead.
+**This implementation uses response-level logs, not per-token telemetry.** `~` means the three-second total includes estimates; the dashboard reports their share. Completed usage corrects the corresponding history, but output is still spread uniformly within each call, so horizontal measured lines are normal. A tools phase can retain a just-completed response's contribution until the three-second window empties; there is no fifteen-second last-rate hold.
 
 Output uses `output_tokens`, which already includes reasoning tokens. `reasoning_output_tokens` must not be added again. Request duration is inferred from input and usage-record timestamps, includes time to first token, and excludes the preceding wait for tool results. Network delays and retries can affect the result. This is a different metric from the model server's internal decoding speed.
 
@@ -95,7 +97,7 @@ If an end event is missing, a session can retain its generation estimate until f
 | `codexSpeed.enabled` | `true` | Enable monitoring |
 | `codexSpeed.codexHome` | Empty | Automatically resolve the Codex data directory |
 | `codexSpeed.scope` | `all` | Monitor `all` recent host sessions or only the current `workspace` |
-| `codexSpeed.pollIntervalMs` | `1000` | Incremental reads and display refresh interval, from 500 to 10000 ms |
+| `codexSpeed.pollIntervalMs` | `500` | Incremental reads and display refresh interval, from 500 to 10000 ms |
 | `codexSpeed.scanDays` | `3` | Include recently modified logs from the last 1–30 days; resumed sessions in older date folders can also be discovered |
 | `codexSpeed.showEstimates` | `true` | Show generation estimates marked with `~` |
 
@@ -140,7 +142,7 @@ If no executable path is supplied, `@vscode/test-electron` downloads a separate 
 
 For a Windows installation using version subdirectories, an updater lock may prevent a new instance from starting. Use `bash scripts/host-test.sh --copy-installed "/path/to/VS Code"` to create an isolated copy under `.vscode-test/isolated-installed`. Only that copy's product metadata is adjusted to disable Windows installer update coordination; the original installation remains read-only. This tests the installed version, not necessarily the minimum supported version.
 
-The package is generated at `artifacts/vscode-codex-speed-0.1.7.vsix`. Starting with 0.1.2, `docs/MARKETPLACE.md` supplies the bilingual user-facing Marketplace overview, and `assets/icon.png` supplies the extension's own icon. Version 0.1.3 includes manifest and runtime translations. The detailed Chinese/English README files remain in the repository. No Node.js dependency installation is required on the server. All VSIX paths use ASCII characters for upload compatibility. Architecture and validation documents remain in the source repository at `docs/设计说明.md` and `docs/验证记录.md`.
+The package is generated at `artifacts/vscode-codex-speed-0.1.8.vsix`. Starting with 0.1.2, `docs/MARKETPLACE.md` supplies the bilingual user-facing Marketplace overview, and `assets/icon.png` supplies the extension's own icon. Version 0.1.3 includes manifest and runtime translations. The detailed Chinese/English README files remain in the repository. No Node.js dependency installation is required on the server. All VSIX paths use ASCII characters for upload compatibility. Architecture and validation documents remain in the source repository at `docs/设计说明.md` and `docs/验证记录.md`.
 
 Run `bash scripts/check-package.sh` to inspect an existing package, optionally passing a VSIX path. Checks reject duplicate paths after lossy ASCII conversion, non-ASCII paths, incorrect publisher/version metadata, and missing entry points or user documentation.
 

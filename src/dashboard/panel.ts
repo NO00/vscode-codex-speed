@@ -24,7 +24,7 @@ export class DashboardPanel implements vscode.Disposable {
   /** 面板相关监听，关闭后统一释放。 */
   private subscriptions: vscode.Disposable[] = [];
   /** 最近一次来自页面脚本的渲染确认，只保存语言及数量。 */
-  private rendered: { locale: string; sessions: number; usageRange?: string; output?: number } | undefined;
+  private rendered: { locale: string; sessions: number; usageRange?: string; output?: number; estimatedBuckets?: number; measuredBuckets?: number } | undefined;
 
   /** 注入只读数据提供器和有限的用户操作，避免 Webview 执行任意命令。 */
   constructor(private readonly extensionUri: vscode.Uri, private readonly getPayload: () => DashboardPayload,
@@ -49,7 +49,7 @@ export class DashboardPanel implements vscode.Disposable {
         if (message.type === 'settings') this.actions.settings();
         if (message.type === 'language' && ['auto', 'en', 'zh-cn', 'zh-tw'].includes(message.value)) this.actions.language(message.value);
         if (message.type === 'usageRange' && ['30m', 'today', '7d', '30d'].includes(message.value)) this.actions.usageRange(message.value);
-        if (message.type === 'rendered' && typeof message.locale === 'string' && Number.isSafeInteger(message.sessions)) this.rendered = { locale: message.locale, sessions: message.sessions, usageRange: message.usageRange, output: message.output };
+        if (message.type === 'rendered' && typeof message.locale === 'string' && Number.isSafeInteger(message.sessions)) this.rendered = { locale: message.locale, sessions: message.sessions, usageRange: message.usageRange, output: message.output, estimatedBuckets: Number.isSafeInteger(message.estimatedBuckets) ? message.estimatedBuckets : undefined, measuredBuckets: Number.isSafeInteger(message.measuredBuckets) ? message.measuredBuckets : undefined };
       })];
   }
 
@@ -60,7 +60,7 @@ export class DashboardPanel implements vscode.Disposable {
   get visible(): boolean { return this.panel?.visible ?? false; }
 
   /** 回放验收用的精简确认，不包含用户会话内容。 */
-  get lastRender(): { locale: string; sessions: number; usageRange?: string; output?: number } | undefined { return this.rendered; }
+  get lastRender(): { locale: string; sessions: number; usageRange?: string; output?: number; estimatedBuckets?: number; measuredBuckets?: number } | undefined { return this.rendered; }
 
   /** 释放监听列表，避免多次打开后重复处理菜单操作。 */
   private clearListeners(): void { this.subscriptions.splice(0).forEach(item => item.dispose()); }

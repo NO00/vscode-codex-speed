@@ -35,7 +35,7 @@ function readOptions(): MonitorOptions {
   return {
     home: resolveHome(config.get<string>('codexHome', '')),
     scanDays: Math.max(1, Math.min(30, config.get<number>('scanDays', 3))),
-    pollIntervalMs: Math.max(500, Math.min(10000, config.get<number>('pollIntervalMs', 1000))),
+    pollIntervalMs: Math.max(500, Math.min(10000, config.get<number>('pollIntervalMs', 500))),
     scope: config.get<'all' | 'workspace'>('scope', 'all'),
     workspaces: (vscode.workspace.workspaceFolders ?? []).map(folder => folder.uri.fsPath),
     showEstimates: config.get<boolean>('showEstimates', true)
@@ -62,11 +62,12 @@ export function tooltip(state: MonitorState, options: MonitorOptions, host: stri
   tip.appendMarkdown('### VSCode Codex Speed\n\n');
   const s = state.snapshot;
   const source = {
-    measured: t('Measured over a three-second window'), estimated: t('Includes estimates from previous rates (~)'),
+    measured: t('Measured over a three-second window'), estimated: t('Includes estimates; history is corrected when usage arrives'),
     waiting: t('Generating, waiting for token counts'),
     tools: t('Waiting for tool results'), idle: t('Idle')
   }[s.kind];
   tip.appendText(t('Output speed: {0} tok/s\n{1}\nSessions: {2} · generating: {3}\n', `${s.kind === 'estimated' ? '~' : ''}${s.rate.toFixed(1)}`, source, s.sessions, s.active));
+  if (s.estimatedShare > 0) tip.appendText(t('Measured {0} · estimated {1} tok/s ({2}%)\n', s.measuredRate.toFixed(1), s.estimatedRate.toFixed(1), Math.round(s.estimatedShare * 100)));
   if (s.latest && measured(s.latest)) tip.appendText(t('Model: {0}\n', s.latest.model === '未知模型' ? t('Unknown model') : s.latest.model));
   tip.appendText(t('Host: {0}\n', host));
   if (state.notice) tip.appendText(`\n${state.notice}\n`);
@@ -127,7 +128,6 @@ export function activate(context: vscode.ExtensionContext): void {
       const result = await current.tick(force);
       if (monitor !== current || disposed) return;
       state = result;
-      history.record(result.snapshot, Date.now(), result.error);
       bar.text = statusText(result);
       bar.tooltip = tooltip(result, options, host);
       bar.backgroundColor = result.error ? new vscode.ThemeColor('statusBarItem.warningBackground') : undefined;
@@ -143,7 +143,6 @@ export function activate(context: vscode.ExtensionContext): void {
       bar.text = `$(warning) Codex ${t('Read error')}`;
       bar.tooltip = t('Click to view diagnostic logs or check the Codex Home setting.');
       state = { snapshot: state?.snapshot ?? calculate([], options, Date.now()), notice: t('Refresh failed: {0}', errorCode(error)), error: true, limited: false };
-      history.record(state.snapshot, Date.now(), true);
       dashboard.update();
     }
   }

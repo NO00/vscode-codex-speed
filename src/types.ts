@@ -49,7 +49,7 @@ export interface MonitorOptions {
   scope: 'all' | 'workspace';
   /** 当前工作区的服务器路径。 */
   workspaces: string[];
-  /** 是否显示带 ~ 标记的历史速率估算。 */
+  /** 是否在生成中估算尚未完成的区间，实测与估算始终分别保留。 */
   showEstimates: boolean;
 }
 
@@ -59,6 +59,12 @@ export interface Snapshot {
   rate: number;
   /** 状态栏数字的来源或等待状态。 */
   kind: 'measured' | 'estimated' | 'waiting' | 'tools' | 'idle';
+  /** 最近三秒窗口内已完成计数贡献的速度。 */
+  measuredRate: number;
+  /** 最近三秒窗口内在途估算贡献的速度。 */
+  estimatedRate: number;
+  /** 估算速度占总速度的比例，范围为 0 到 1；零速度时为零。 */
+  estimatedShare: number;
   /** 有效的正在生成会话数。 */
   active: number;
   /** 范围内已跟踪的会话数。 */
