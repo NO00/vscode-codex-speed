@@ -65,11 +65,14 @@ jobs:
         run: bash scripts/release/upload.sh
         env:
           GH_TOKEN: ${{ github.token }}
+      - name: 说明尚未启用的市场发布
+        if: github.event_name == 'release' && vars.MARKETPLACE_OIDC_ENABLED != 'true'
+        run: bash scripts/release/status.sh
 
   publish:
     name: 通过 OIDC 发布到 Marketplace
     needs: build
-    if: github.event_name == 'release' && github.event.release.prerelease == false
+    if: github.event_name == 'release' && github.event.release.prerelease == false && vars.MARKETPLACE_OIDC_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:

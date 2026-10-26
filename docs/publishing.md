@@ -12,6 +12,8 @@
 4. 将 VSIX 与 SHA-256 文件上传至该 Release，并保存一份 Actions 构建产物。同名 Release 附件以本次构建结果为准。
 5. 发布任务下载同一份构建产物，先核对原 SHA-256，再通过 GitHub OIDC 取得短期 Marketplace 凭证并发布。
 
+当前 Marketplace 端的原生可信策略入口尚未确认可用，因此仓库变量 `MARKETPLACE_OIDC_ENABLED` 保持 `false`。在此状态下，正式 Release 仍自动构建和上传 VSIX，但市场发布任务跳过，并在运行摘要中明确说明“未发布到 Marketplace”。完成策略绑定并验证后，才能将该变量改为 `true`。
+
 工作流只监听 `release.published`，创建草稿不会触发。标记为预发布的 Release 会跳过。`workflow_dispatch` 是手动预检入口，只测试、构建和保存 Actions 产物，不上传 Release 附件，也不发布到 Marketplace；可额外勾选 `verify_oidc`，仅验证短期凭证交换。
 
 ## 一次性绑定可信发布
@@ -27,11 +29,15 @@ GitHub 工作流中的 `id-token: write` 允许请求身份令牌，但不会自
 | GitHub Environment | `marketplace` |
 | OIDC Issuer | `https://token.actions.githubusercontent.com` |
 | Audience | `marketplace.visualstudio.com` |
-| Environment Subject | `repo:NO00/vscode-codex-speed:environment:marketplace` |
+| Environment Subject | 必须以 GitHub 实际签发的 `sub` 为准；新仓库可能采用包含不可变所有者/仓库 ID 的格式 |
 
 以 Marketplace 实际提供的字段为准；不要把 GitHub Environment 当成仓库名称，也不要把域名认证当成可信发布绑定。策略属于微软托管的发布者账号配置，需要账号所有者在登录后完成；仅提交本仓库代码不能替代这一步。
 
+不要直接套用旧示例中的 `repo:所有者/仓库:environment:marketplace` Subject：GitHub 对新建或迁移的仓库可能使用包含不可变 ID 的默认格式。若策略要求手工填写 Subject，需要先确认实际身份声明。
+
 如果账号页面尚未提供 Trusted publishing / OIDC 策略入口，应先确认此功能是否已对该发布者开放。此配置不会自动切换到 PAT，不需要把任何密码或 Token 发到聊天中。
+
+无需依赖该原生策略入口的另一条免 PAT 路线是微软正式支持的 Entra OIDC：创建 Entra 应用及联合身份，将其服务主体添加为 Marketplace 发布者成员，再通过 `--azure-credential` 发布。这需要租户和应用注册权限，不能仅修改本仓库文件完成。
 
 GitHub 的 `marketplace` Environment 未配置人工审批，因此正常发布无需每次确认。若后续自行添加 Environment 审批规则，发布任务会按新规则等待审批。
 
