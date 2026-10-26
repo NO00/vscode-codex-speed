@@ -11,13 +11,13 @@ The extension runs as a `workspace` extension. In a remote window, it reads Code
 ## Install in a Remote SSH window
 
 1. Connect to your server using **Remote - SSH** and open a remote folder.
-2. Open the Command Palette and run **Extensions: Install from VSIX...**. Select `vscode-codex-speed-0.1.0.vsix`.
+2. Open the Command Palette and run **Extensions: Install from VSIX...**. Select `vscode-codex-speed-0.1.1.vsix`.
 3. Confirm that **VSCode Codex Speed** appears under **SSH: your-server — Installed** in the Extensions view. If it is installed only locally, select **Install in SSH: your-server**. Run **Developer: Reload Window** if needed.
 4. Run Codex on the server as the same user. The status bar will show `Codex … tok/s`. New sessions are normally discovered within about five seconds, and existing logs are polled every second by default. Click the item to refresh, view details, or open settings.
 
 The extension host must have permission to read the Codex user's data directory. If Codex runs as a different user, inside a container, or with a custom `CODEX_HOME`, install the extension in the matching environment or configure an accessible directory.
 
-If you previously installed **Codex SSH Speed**, uninstall that older extension before installing this package. The extension ID has changed, and running both versions can cause duplicate status items and command registrations. Existing `codexSpeed.*` settings remain compatible.
+Starting with 0.1.1, the publisher is the actual Marketplace publisher `NO00`, and the extension ID is `NO00.vscode-codex-speed`. Uninstall **Codex SSH Speed**, or **VSCode Codex Speed 0.1.0** published under `local-codex-tools`, before installing this package. Running the old and new IDs together can cause duplicate status items and command registrations. Existing `codexSpeed.*` settings remain compatible.
 
 ## Configure the log directory
 
@@ -115,7 +115,9 @@ If no executable path is supplied, `@vscode/test-electron` downloads a separate 
 
 For a Windows installation using version subdirectories, an updater lock may prevent a new instance from starting. Use `bash scripts/host-test.sh --copy-installed "/path/to/VS Code"` to create an isolated copy under `.vscode-test/isolated-installed`. Only that copy's product metadata is adjusted to disable Windows installer update coordination; the original installation remains read-only. This tests the installed version, not necessarily the minimum supported version.
 
-The package is generated at `artifacts/vscode-codex-speed-0.1.0.vsix`. It includes compiled code and Chinese/English documentation; no Node.js dependency installation is required on the server. Architecture and validation notes are available in the Chinese documents `docs/设计说明.md` and `docs/验证记录.md`.
+The package is generated at `artifacts/vscode-codex-speed-0.1.1.vsix`. It includes compiled code and Chinese/English documentation; no Node.js dependency installation is required on the server. All paths inside the VSIX use ASCII characters for compatibility with Marketplace upload processing. Architecture and validation documents with Chinese filenames remain in the source repository at `docs/设计说明.md` and `docs/验证记录.md`.
+
+Run `bash scripts/check-package.sh` to inspect an existing package, optionally passing a VSIX path. Checks reject duplicate paths after lossy ASCII conversion, non-ASCII paths, incorrect publisher/version metadata, and missing entry points or user documentation.
 
 ## References
 

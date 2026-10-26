@@ -2,8 +2,8 @@
   "name": "vscode-codex-speed",
   "displayName": "VSCode Codex Speed",
   "description": "读取 Remote SSH 主机的 Codex 会话日志，在状态栏显示输出 token/s、估算状态和最近调用速度。",
-  "version": "0.1.0",
-  "publisher": "local-codex-tools",
+  "version": "0.1.1",
+  "publisher": "NO00",
   "license": "MIT",
   "repository": {
     "type": "git",

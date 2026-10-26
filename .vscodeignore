@@ -12,3 +12,5 @@ tsconfig.json
 .gitignore
 .gitattributes
 .vscodeignore
+docs/设计说明.md
+docs/验证记录.md

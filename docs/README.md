@@ -7,13 +7,13 @@
 ## 安装到 Remote SSH
 
 1. 在本机 VS Code 使用 **Remote - SSH** 连接服务器，并打开一个远程目录。
-2. 按 `Ctrl+Shift+P`，执行 **Extensions: Install from VSIX...（扩展：从 VSIX 安装）**，选择 `vscode-codex-speed-0.1.0.vsix`。
+2. 按 `Ctrl+Shift+P`，执行 **Extensions: Install from VSIX...（扩展：从 VSIX 安装）**，选择 `vscode-codex-speed-0.1.1.vsix`。
 3. 在扩展面板确认 **VSCode Codex Speed** 位于 **SSH: 服务器名 — 已安装**。如果只安装在本地，点击扩展上的 **Install in SSH: 服务器名**。必要时执行 **Developer: Reload Window**。
 4. 在服务器上以同一个用户运行 Codex。底部状态栏会出现 `Codex … tok/s`；新会话自动发现最多约需 5 秒，之后默认每秒读取新增日志。点击状态栏可以刷新、查看详情、打开设置。
 
 扩展宿主必须能读取运行 Codex 的用户目录。如果 Codex 在另一个用户、Docker 容器或独立 `CODEX_HOME` 中运行，需要在相应远程环境安装扩展或显式配置可读目录。
 
-如果之前安装过旧名称的 **Codex SSH Speed**，请先卸载旧扩展再安装本包，避免两个扩展同时注册相同命令和状态栏。已有 `codexSpeed.*` 设置可以继续使用。
+从 0.1.1 开始，发布者标识使用实际 Marketplace Publisher `NO00`，完整插件 ID 为 `NO00.vscode-codex-speed`。如果之前安装过 **Codex SSH Speed**，或发布者为 `local-codex-tools` 的 **VSCode Codex Speed 0.1.0**，请先卸载旧扩展再安装本包，避免重复状态栏和命令注册。已有 `codexSpeed.*` 设置可以继续使用。
 
 ## 目录配置
 
@@ -98,7 +98,9 @@ Windows 真实宿主测试示例：
 
 若本机为使用版本子目录的 Windows 安装，且更新锁阻止启动，可使用 `bash scripts/host-test.sh --copy-installed "/path/to/VS Code"`。脚本把当前版本复制到 `.vscode-test/isolated-installed`，仅在副本的产品元数据中关闭 Windows 安装器更新协调，原安装保持只读。这适合验证当前已安装版本，不代表最低版本验证。
 
-产物位于 `artifacts/vscode-codex-speed-0.1.0.vsix`。VSIX 包含已编译代码和中英文使用说明，不需要在服务器安装 Node.js 依赖。架构与测速细节见源码中的 `docs/设计说明.md`。
+产物位于 `artifacts/vscode-codex-speed-0.1.1.vsix`。VSIX 包含已编译代码和中英文使用说明，不需要在服务器安装 Node.js 依赖。为兼容 Marketplace 上传端，包内文件路径只使用 ASCII 字符；中文文件名的设计和验证文档仅保留在源码仓库，见 `docs/设计说明.md` 与 `docs/验证记录.md`。
+
+`bash scripts/check-package.sh` 可独立校验现有安装包；也可在命令末尾传入待检查的 VSIX 路径。检查包括路径编码退化后的重名、非 ASCII 路径、实际 Publisher、版本、入口和中英文使用说明。
 
 ## 参考
 

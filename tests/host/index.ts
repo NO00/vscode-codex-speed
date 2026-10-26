@@ -32,7 +32,7 @@ export async function run(): Promise<void> {
   const report = process.env.CODEX_SPEED_TEST_REPORT!;
   try {
     const home = process.env.CODEX_SPEED_TEST_HOME!;
-    const extension = vscode.extensions.getExtension('local-codex-tools.vscode-codex-speed');
+    const extension = vscode.extensions.getExtension('NO00.vscode-codex-speed');
     assert.ok(extension, '扩展必须被 VS Code 发现');
     assert.deepEqual(extension.packageJSON.extensionKind, ['workspace']);
     await extension.activate();

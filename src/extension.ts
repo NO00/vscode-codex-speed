@@ -111,7 +111,7 @@ export function activate(context: vscode.ExtensionContext): void {
     // 只返回计数及运行状态，供诊断和真实扩展宿主回放使用。
     vscode.commands.registerCommand('codexSpeed.getDiagnostics', () => ({ state, text: bar.text, home: options.home, remote: vscode.env.remoteName ?? 'local' })),
     vscode.commands.registerCommand('codexSpeed.showLogs', () => output.show()),
-    vscode.commands.registerCommand('codexSpeed.openSettings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:local-codex-tools.vscode-codex-speed')),
+    vscode.commands.registerCommand('codexSpeed.openSettings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:NO00.vscode-codex-speed')),
     vscode.commands.registerCommand('codexSpeed.refresh', () => render(true)),
     vscode.commands.registerCommand('codexSpeed.showDetails', async () => {
       const choice = await vscode.window.showQuickPick([
