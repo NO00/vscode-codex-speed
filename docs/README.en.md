@@ -96,7 +96,7 @@ Diagnostic logs record operational messages, paths, and operating-system error c
 
 ## Develop, test, and package
 
-Requires Node.js 20+ and Bash. On Windows, Git Bash can be used. Dependency installation, builds, and tests run through scripts in `scripts/`; their output is also saved under `logs/`.
+Building and publishing require Node.js 22+ and Bash. On Windows, Git Bash can be used. Dependency installation, builds, and tests run through scripts in `scripts/`; their output is also saved under `logs/`.
 
 ```bash
 bash scripts/setup.sh
@@ -120,6 +120,8 @@ For a Windows installation using version subdirectories, an updater lock may pre
 The package is generated at `artifacts/vscode-codex-speed-0.1.2.vsix`. Starting with 0.1.2, `docs/MARKETPLACE.md` supplies the bilingual user-facing Marketplace overview, and `assets/icon.png` supplies the extension's own icon. The detailed Chinese/English README files remain in the repository. No Node.js dependency installation is required on the server. All VSIX paths use ASCII characters for upload compatibility. Architecture and validation documents remain in the source repository at `docs/设计说明.md` and `docs/验证记录.md`.
 
 Run `bash scripts/check-package.sh` to inspect an existing package, optionally passing a VSIX path. Checks reject duplicate paths after lossy ASCII conversion, non-ASCII paths, incorrect publisher/version metadata, and missing entry points or user documentation.
+
+Stable GitHub Releases can publish automatically through GitHub OIDC after a one-time trusted-publishing policy is configured for the Marketplace publisher. Manual workflow dispatch performs a build-only preflight. Configuration details and workflow behavior are documented in the Chinese [publishing guide](publishing.md).
 
 ## References
 

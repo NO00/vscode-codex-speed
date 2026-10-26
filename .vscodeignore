@@ -1,4 +1,5 @@
 .git/**
+.github/**
 .vscode-test/**
 node_modules/**
 src/**
@@ -17,3 +18,4 @@ docs/验证记录.md
 docs/README.md
 docs/README.en.md
 docs/design/**
+docs/publishing.md

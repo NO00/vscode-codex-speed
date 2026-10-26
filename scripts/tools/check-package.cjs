@@ -5,7 +5,8 @@ const yauzl = require('yauzl');
 
 /** 验证实际 VSIX 的部署声明、入口和文件清单，避免把测试与依赖打进包。 */
 async function main() {
-  const file = process.argv[2] || 'artifacts/vscode-codex-speed-0.1.2.vsix';
+  const sourceManifest = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+  const file = process.argv[2] || `artifacts/${sourceManifest.name}-${sourceManifest.version}.vsix`;
   const entries = new Map();
   await new Promise((resolve, reject) => {
     yauzl.open(file, { lazyEntries: true }, (error, zip) => {
@@ -34,7 +35,6 @@ async function main() {
   }
   assert.ok([...entries.keys()].every(name => /^[\x20-\x7e]+$/.test(name)), 'VSIX 内部路径必须使用 ASCII 字符，避免市场上传端的编码兼容问题');
   const manifest = JSON.parse(entries.get('extension/package.json').toString());
-  const sourceManifest = JSON.parse(fs.readFileSync('package.json', 'utf8'));
   assert.equal(manifest.name, sourceManifest.name);
   assert.equal(manifest.version, sourceManifest.version);
   assert.equal(manifest.publisher, 'NO00', '安装包必须使用实际的 Marketplace Publisher ID');
