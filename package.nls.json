@@ -1,4 +1,9 @@
 {
+  "config.usageRange": "Dashboard usage period. Today uses the dashboard client's time zone. Historical JSONL records are indexed and cached in extension storage for up to 30 days; initial indexing may take time.",
+  "config.usageRange.30m": "Last 30 minutes.",
+  "config.usageRange.today": "Today in the VS Code client's time zone (default).",
+  "config.usageRange.7d": "Last 7 × 24 hours.",
+  "config.usageRange.30d": "Last 30 × 24 hours.",
   "command.openDashboard": "Codex Speed: Open Dashboard",
   "config.language": "Language for the status bar, hover summary, dashboard and diagnostic messages. Applies immediately. Command Palette titles and Settings descriptions follow the VS Code display language.",
   "config.language.auto": "Follow the VS Code display language (use English for unsupported languages).",

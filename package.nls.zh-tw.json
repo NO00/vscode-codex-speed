@@ -1,4 +1,9 @@
 {
+  "config.usageRange": "儀表板用量時間範圍。今天依儀表板用戶端時區劃分；歷史 JSONL 用量在擴充功能儲存目錄中建立索引並快取，最多保留 30 天。首次回填需要一些時間。",
+  "config.usageRange.30m": "最近 30 分鐘。",
+  "config.usageRange.today": "VS Code 用戶端時區的今天（預設）。",
+  "config.usageRange.7d": "最近 7 × 24 小時。",
+  "config.usageRange.30d": "最近 30 × 24 小時。",
   "command.openDashboard": "Codex Speed: 開啟儀表板",
   "config.language": "狀態列、懸浮摘要、儀表板和診斷提示的語言，切換後立即生效。命令選擇區標題和設定說明跟隨 VS Code 顯示語言。",
   "config.language.auto": "跟隨 VS Code 顯示語言；未支援的語言使用英文。",

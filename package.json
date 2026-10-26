@@ -2,7 +2,7 @@
   "name": "vscode-codex-speed",
   "displayName": "VSCode Codex Speed",
   "description": "%extension.description%",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "NO00",
   "icon": "assets/icon.png",
   "galleryBanner": {
@@ -70,6 +70,14 @@
     "configuration": {
       "title": "VSCode Codex Speed",
       "properties": {
+        "codexSpeed.usageRange": {
+          "type": "string",
+          "enum": ["30m", "today", "7d", "30d"],
+          "enumDescriptions": ["%config.usageRange.30m%", "%config.usageRange.today%", "%config.usageRange.7d%", "%config.usageRange.30d%"],
+          "default": "today",
+          "description": "%config.usageRange%",
+          "scope": "machine"
+        },
         "codexSpeed.language": {
           "type": "string",
           "enum": ["auto", "en", "zh-cn", "zh-tw"],

@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { calculate, inWorkspace, measured } from '../engine';
 import { MonitorOptions, Sample, Session, Snapshot } from '../types';
+import { HistoryStatus, UsageRange, UsageSummary } from '../history/types';
 
 /** 曲线采样点；估算与实测保持不同来源，不能将上次调用当作实时曲线。 */
 export interface SpeedPoint {
@@ -49,7 +50,9 @@ export interface DashboardData {
   /** 过滤和合并后的会话列表。 */
   sessions: SessionSummary[];
   /** 可用记录的全局去重计数及加权平均速度。 */
-  usage: { input: number; output: number; responses: number; average: number; peak: number };
+  usage: { input: number; output: number; responses: number; average: number; peak: number; range: UsageRange; from: number; timeZone: string };
+  /** 历史索引进度和完整性，与实时监控错误分开显示。 */
+  history: HistoryStatus;
 }
 
 /** 只积累小型速度采样，不另开日志扫描、模型请求或计时器。 */
@@ -68,7 +71,7 @@ export class DashboardHistory {
   }
 
   /** 只有面板可见时构造会话及用量，常规状态栏轮询不重复汇总。 */
-  data(sessions: Session[], options: MonitorOptions, snapshot: Snapshot, now: number): DashboardData {
+  data(sessions: Session[], options: MonitorOptions, snapshot: Snapshot, now: number, historical?: UsageSummary, status?: HistoryStatus): DashboardData {
     const selected = sessions.filter(session => options.scope === 'all' || inWorkspace(session.cwd, options.workspaces));
     const grouped = new Map<string, Session[]>();
     for (const session of selected) grouped.set(session.id, [...(grouped.get(session.id) ?? []), session]);
@@ -90,14 +93,17 @@ export class DashboardHistory {
         model: current.model === '未知模型' ? '' : current.model, phase: active ? current.phase : 'idle',
         rate: rate.rate, kind: rate.kind, input: [...own.values()].reduce((sum, sample) => sum + sample.input, 0),
         output: rate.output, responses: rate.responses, lastEvent: current.lastEvent });
+      const totals = historical?.bySession.get(id);
+      if (historical) Object.assign(rows.at(-1)!, totals ?? { input: 0, output: 0, responses: 0 });
     }
     const samples = [...unique.values()];
     const timed = samples.filter(measured);
     const duration = timed.reduce((sum, sample) => sum + sample.end - sample.start, 0);
     const points = this.points.filter(point => point.time >= now - 300000 && point.time <= now);
     return { now, snapshot, points, sessions: rows.sort((a, b) => Number(b.phase !== 'idle') - Number(a.phase !== 'idle') || b.lastEvent - a.lastEvent),
-      usage: { input: samples.reduce((sum, sample) => sum + sample.input, 0), output: samples.reduce((sum, sample) => sum + sample.output, 0),
-        responses: samples.length, average: duration ? timed.reduce((sum, sample) => sum + sample.output, 0) * 1000 / duration : 0,
-        peak: points.reduce((peak, point) => Math.max(peak, point.rate), 0) } };
+      usage: { input: historical?.input ?? samples.reduce((sum, sample) => sum + sample.input, 0), output: historical?.output ?? samples.reduce((sum, sample) => sum + sample.output, 0),
+        responses: historical?.responses ?? samples.length, average: historical?.average ?? (duration ? timed.reduce((sum, sample) => sum + sample.output, 0) * 1000 / duration : 0),
+        peak: points.reduce((peak, point) => Math.max(peak, point.rate), 0), range: historical?.range ?? '30m', from: historical?.from ?? now - 1800000, timeZone: historical?.timeZone ?? 'UTC' },
+      history: status ?? { indexing: false, scanned: 0, total: 0, limited: false, readErrors: 0, cacheError: false, cacheReset: false, follower: false } };
   }
 }

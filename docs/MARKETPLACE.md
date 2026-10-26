@@ -19,7 +19,7 @@ Codex 85.0 tok/s · 上次   最近一次调用 / Last completed call
 - 直接在状态栏查看 Codex 的输出 token/s，悬停查看最近调用的模型、输出数量和耗时。
 - 在 Remote SSH 窗口读取服务器上的 Codex 日志，不用手动同步日志或再次配置 SSH 连接。
 - 汇总多个会话和子 agent，也可以只查看当前工作区中的会话。
-- 点击状态栏打开仪表盘：速度仪表、1／2／5 分钟曲线、会话列表及近半小时用量。
+- 点击状态栏打开仪表盘：速度仪表、1／2／5 分钟曲线、会话列表及可切换范围的用量。
 
 这是独立的社区扩展，不属于 OpenAI 官方产品。界面默认跟随 VS Code 显示语言，支持英文、简体中文和繁体中文；其他语言使用英文。
 
@@ -27,7 +27,9 @@ Codex 85.0 tok/s · 上次   最近一次调用 / Last completed call
 
 ### 仪表盘
 
-悬停显示简洁摘要，点击状态栏打开完整仪表盘。曲线从本次监控启动后开始积累，实线为实测，虚线包含估算。用量仅统计近 30 分钟已读取的日志，不是全天数据；输入可能含缓存 token，平均速度使用耗时已知的已完成调用。峰值可能包含估算。
+悬停显示简洁摘要，点击状态栏打开完整仪表盘。曲线从本次监控启动后开始积累，实线为实测，虚线包含估算。用量支持近 30 分钟、今天、近 7 天和近 30 天，默认“今天”，按 VS Code 客户端时区划分。近 7／30 天为滚动小时窗口。输入可能含缓存 token，平均速度使用耗时已知的已完成调用；五分钟峰值仍来自实时采样，可能包含估算。
+
+首次使用会分批索引历史，显示进度及不完整提示。缓存保存计数与读取断点，重启后继续增量读取；只支持 `sessions` 目录下近 30 天内更新的未压缩 JSONL。缓存文件保存在扩展存储目录，Codex 日志保持只读。
 
 可直接在面板底部选择语言，顶部重新扫描或打开设置。关闭面板后仍按已有监控周期采样，未增加额外扫描计时器；没有费用或网络流量统计。
 
@@ -65,6 +67,7 @@ Codex 85.0 tok/s · 上次   最近一次调用 / Last completed call
 
 | 设置 | 默认值 | 用途 |
 | --- | --- | --- |
+| `codexSpeed.usageRange` | `today` | 用量范围，可选 `30m`、`today`、`7d`、`30d` |
 | `codexSpeed.language` | `auto` | 跟随 VS Code，或手动选择 `en`、`zh-cn`、`zh-tw`，立即生效 |
 | `codexSpeed.scope` | `all` | 改为 `workspace`，仅查看当前工作区中的会话 |
 | `codexSpeed.showEstimates` | `true` | 改为 `false`，生成中等待完成记录再显示实测结果 |
@@ -88,7 +91,7 @@ Codex 85.0 tok/s · 上次   最近一次调用 / Last completed call
 - Codex output tokens per second in the status bar. Hover for the latest measured call's model, output count, and duration.
 - Direct log monitoring on your Remote SSH host, with no manual log synchronization or extra SSH connection setup.
 - Combined readings for multiple sessions and subagents, or a view limited to your workspace folders.
-- A dashboard with a speed gauge, 1/2/5-minute charts, session summaries and usage from the last 30 minutes.
+- A dashboard with a speed gauge, 1/2/5-minute charts, session summaries and selectable usage periods.
 
 This is an independent community extension, not an official OpenAI product. The UI follows the VS Code display language by default. English, Simplified Chinese and Traditional Chinese are supported; other languages fall back to English.
 
@@ -96,7 +99,7 @@ Set `codexSpeed.language` to `auto` (default), `en`, `zh-cn` or `zh-tw` in User 
 
 ### Dashboard
 
-Hover for a compact summary, or click the status item to open the full dashboard. Speed history accumulates while monitoring; solid segments are measured and dashed segments include estimates. Usage covers available log records in the last 30 minutes, not daily totals. Input may include cached tokens; average speed uses completed calls with known duration. The peak can include estimates.
+Hover for a compact summary, or click the status item to open the full dashboard. Speed history accumulates while monitoring; solid segments are measured and dashed segments include estimates. Usage supports the last 30 minutes, today, the last 7 days and the last 30 days. Today is the default and uses the VS Code client’s time zone; 7/30-day periods use rolling hours. Input may include cached tokens; average speed uses completed calls with known duration. The peak can include estimates.
 
 Select a language at the bottom, rescan or open Settings from the toolbar. Closing the dashboard keeps the existing status-bar sampling active, without another scanning timer. Cost and network traffic tracking are not included.
 
@@ -124,10 +127,13 @@ For a custom data directory, set `codexSpeed.codexHome` in VS Code **User or Rem
 
 The default host-wide scope includes other sessions, even when the chat you are viewing has stopped. Missing completion events can leave generation estimates active until five minutes after the latest log event.
 
+Historical usage is indexed in batches from uncompressed JSONL files under `sessions` modified within the last 30 days. Initial indexing and incomplete results are clearly marked. Counters and read cursors are cached in extension storage so indexing can resume after a restart; Codex logs remain read-only.
+
 ### Useful settings
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
+| `codexSpeed.usageRange` | `today` | Usage period: `30m`, `today`, `7d` or `30d` |
 | `codexSpeed.language` | `auto` | Follow VS Code or manually select `en`, `zh-cn` or `zh-tw`; applies immediately |
 | `codexSpeed.scope` | `all` | Use `workspace` to include only sessions inside the current workspace folders |
 | `codexSpeed.showEstimates` | `true` | Set to `false` to wait for completed usage records rather than show generation estimates |

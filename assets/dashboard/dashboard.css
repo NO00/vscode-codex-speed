@@ -8,6 +8,17 @@
   --accent:#5edeb1;
   --soft:rgba(94,222,177,.1);
 }
+.history-status {
+  color: var(--vscode-editorWarning-foreground, #dfb971);
+  margin: 0 0 14px;
+}
+#usage-range {
+  max-width: 160px;
+  font-size: 11px;
+}
+#history-note, #usage-timezone {
+  margin-top: 6px;
+}
 * {
   box-sizing:border-box;
 }

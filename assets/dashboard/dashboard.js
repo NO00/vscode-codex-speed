@@ -93,6 +93,16 @@
     document.documentElement.lang = payload.locale;
     const mapping = { 'dashboard-title': 'dashboard', 'live-label': 'live', 'curve-title': 'curve', 'range-60': 'oneMinute', 'range-120': 'twoMinutes', 'range-300': 'fiveMinutes', 'measured-label': 'measured', 'estimated-label': 'estimated', 'curve-note': 'curveNote', 'source-title': 'source', 'source-note': 'sourceNote', 'sessions-title': 'sessions', 'usage-title': 'usage', 'output-label': 'output', 'input-label': 'input', 'responses-label': 'responses', 'average-label': 'average', 'peak-label': 'peak', 'usage-note': 'usageNote', 'host-label': 'host', 'directory-label': 'directory', 'scope-label': 'scope', 'language-label': 'language', 'language-auto': 'auto', 'estimate-note': 'estimateNote', 'last-note': 'lastNote', 'stale-note': 'stale', 'privacy-note': 'noCosts' };
     for (const [id, key] of Object.entries(mapping)) text(id, labels[key]);
+    for (const [value, key] of [['30m', 'last30m'], ['today', 'today'], ['7d', 'last7d'], ['30d', 'last30d']]) text(`usage-${value}`, labels[key]);
+    const period = document.getElementById('usage-range');
+    period.value = data.usage.range; period.setAttribute('aria-label', labels.usageRange);
+    text('history-note', labels.historyNote);
+    text('usage-timezone', `${labels.timeZone}: ${data.usage.timeZone}`);
+    text('stale-note', `${labels.stale} ${labels.sessionPeriod}`);
+    const history = data.history;
+    const indexing = history.indexing ? `${context.enabled ? labels.indexing : labels.incomplete} · ${number(history.scanned)} / ${number(history.total)} ${labels.indexedFiles}. ${labels.incomplete}` : '';
+    const warnings = [indexing, history.limited || history.readErrors ? `${labels.historyPartial} ${labels.incomplete}` : '', history.cacheError ? labels.cacheError : '', history.cacheReset ? labels.cacheReset : ''].filter(Boolean);
+    text('history-status', warnings.join(' ')); document.getElementById('history-status').hidden = !warnings.length;
     for (const id of ['refresh', 'settings']) { document.getElementById(id).title = labels[id]; document.getElementById(id).setAttribute('aria-label', labels[id]); }
     const phase = context.error ? 'error' : snapshot.kind;
     text('rate', context.error || !context.enabled ? '—' : `${snapshot.kind === 'estimated' ? '~' : ''}${snapshot.rate.toFixed(1)}`);
@@ -115,13 +125,14 @@
     document.getElementById('language').value = payload.selectedLanguage;
     drawChart(); drawSessions();
     // 只用于宿主确认脚本收到并绘制了真实数据，不回传路径、模型或会话内容。
-    api.postMessage({ type: 'rendered', locale: payload.locale, sessions: data.sessions.length });
+    api.postMessage({ type: 'rendered', locale: payload.locale, sessions: data.sessions.length, usageRange: data.usage.range, output: data.usage.output });
   }
   for (const button of document.querySelectorAll('[data-range]')) button.addEventListener('click', () => {
     range = Number(button.dataset.range); api.setState({ range }); if (latest) drawChart();
   });
   for (const type of ['refresh', 'settings']) document.getElementById(type).addEventListener('click', () => api.postMessage({ type }));
   document.getElementById('language').addEventListener('change', event => api.postMessage({ type: 'language', value: event.target.value }));
+  document.getElementById('usage-range').addEventListener('change', event => api.postMessage({ type: 'usageRange', value: event.target.value }));
   window.addEventListener('message', event => { if (event.data?.type === 'update') render(event.data.payload); });
-  api.postMessage({ type: 'ready' });
+  api.postMessage({ type: 'ready', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
 })();

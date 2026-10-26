@@ -8,7 +8,7 @@ export function dashboardMessages(t: Translate): Record<string, string> {
     curve: t('Output speed'), oneMinute: t('1 min'), twoMinutes: t('2 min'), fiveMinutes: t('5 min'),
     collecting: t('Collecting speed history…'), curveNote: t('Recorded while monitoring. Dashed segments include estimates.'),
     sessions: t('Sessions'), model: t('Model'), unknownModel: t('Unknown model'), unnamed: t('Unnamed session'),
-    noSessions: t('No sessions in this scope yet.'), usage: t('Last 30 minutes'), input: t('Input tokens'), output: t('Output tokens'),
+    noSessions: t('No sessions in this scope yet.'), usage: t('Usage'), last30m: t('Last 30 minutes'), today: t('Today'), last7d: t('Last 7 days'), last30d: t('Last 30 days'), usageRange: t('Usage period'), input: t('Input tokens'), output: t('Output tokens'),
     responses: t('Responses'), average: t('Average speed'), peak: t('5-minute peak'), usageNote: t('Available log records only. Input may include cached tokens. Average uses completed calls with known duration.'),
     estimateNote: t('~ marks an estimate. Duration includes time to first token; output includes reasoning.'),
     host: t('Host'), directory: t('Directory'), scope: t('Scope'), all: t('All recent sessions on this host'), workspace: t('Current workspace'),
@@ -18,6 +18,12 @@ export function dashboardMessages(t: Translate): Record<string, string> {
     outputUnit: t('output tokens'), requestUnit: t('responses'), sourceNote: t('Read-only Codex logs'),
     noCosts: t('No cost or network traffic tracking'), chartLabel: t('Output speed over time'), totalSessions: t('tracked'),
     lastNote: t('Last completed call; the live curve is zero while idle.'),
-    stale: t('Session activity expires after five minutes without new events.')
+    stale: t('Session activity expires after five minutes without new events.'),
+    indexing: t('Indexing history'), indexedFiles: t('files processed'), incomplete: t('Totals may be incomplete.'),
+    historyPartial: t('Some history could not be read or a resource limit was reached.'),
+    cacheError: t('History cache is unavailable. Results are kept in memory for this session.'),
+    cacheReset: t('The cache was rebuilt from available logs.'), timeZone: t('Time zone'),
+    historyNote: t('History is retained for 30 days. Only uncompressed session JSONL files are indexed.'),
+    sessionPeriod: t('Session counts use the selected usage period; activity uses recent log events.')
   };
 }

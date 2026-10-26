@@ -10,6 +10,8 @@ import { createTranslator, resolveLanguage, Translate } from './localization';
 import { DashboardHistory } from './dashboard/model';
 import { dashboardMessages } from './dashboard/messages';
 import { DashboardPanel, DashboardPayload } from './dashboard/panel';
+import { UsageIndex } from './history';
+import { usageRange, validTimeZone } from './history/ranges';
 
 /** 使用客户端显示语言；Remote SSH 宿主不读取服务器系统语言。 */
 let translate: Translate = vscode.l10n.t;
@@ -88,18 +90,27 @@ export function activate(context: vscode.ExtensionContext): void {
   let state: MonitorState | undefined;
   let options = readOptions();
   let history = new DashboardHistory();
+  /** 历史缓存按 Codex Home 隔离，保存在扩展宿主的 globalStorage 下。 */
+  let usageIndex: UsageIndex | undefined;
+  let indexHome = '';
+  let indexWork: Promise<void> | undefined;
+  let timeZone = validTimeZone(context.globalState.get<string>('usage.timeZone', 'UTC'));
   /** 从现有只读监控器创建面板快照，隐藏时不会被调用。 */
   function dashboardPayload(): DashboardPayload {
     const snapshot = state?.snapshot ?? calculate([], options, Date.now());
-    return { data: history.data(monitor ? [...monitor.tailers.values()].map(item => item.parser) : [], options, snapshot, Date.now()),
+    const sessions = monitor ? [...monitor.tailers.values()].map(item => item.parser) : [];
+    const selectedRange = usageRange(vscode.workspace.getConfiguration('codexSpeed').get('usageRange', 'today'));
+    return { data: history.data(sessions, options, snapshot, Date.now(), usageIndex?.query(selectedRange, timeZone, options, sessions), usageIndex?.status),
       labels: dashboardMessages(t), locale: uiLanguage,
       selectedLanguage: vscode.workspace.getConfiguration('codexSpeed').get<string>('language', 'auto'),
       context: { host, home: options.home, scope: options.scope, notice: state?.notice ?? '', error: state?.error ?? false,
         limited: state?.limited ?? false, enabled: vscode.workspace.getConfiguration('codexSpeed').get<boolean>('enabled', true) } };
   }
   const dashboard = new DashboardPanel(context.extensionUri, dashboardPayload, {
-    refresh: () => { void render(true); }, settings: () => { void vscode.commands.executeCommand('codexSpeed.openSettings'); },
-    language: value => { void vscode.workspace.getConfiguration('codexSpeed').update('language', value, vscode.ConfigurationTarget.Global); }
+    refresh: () => { void vscode.commands.executeCommand('codexSpeed.refresh'); }, settings: () => { void vscode.commands.executeCommand('codexSpeed.openSettings'); },
+    language: value => { void vscode.workspace.getConfiguration('codexSpeed').update('language', value, vscode.ConfigurationTarget.Global); },
+    usageRange: value => { void vscode.workspace.getConfiguration('codexSpeed').update('usageRange', value, vscode.ConfigurationTarget.Global); },
+    timeZone: value => { const next = validTimeZone(value); if (next !== timeZone) { timeZone = next; void context.globalState.update('usage.timeZone', next); } }
   });
 
   /** 自动模式使用 VS Code 原生翻译；手动模式仅在设置变化时读取内置资源。 */
@@ -123,6 +134,11 @@ export function activate(context: vscode.ExtensionContext): void {
       bar.backgroundColor = result.error ? new vscode.ThemeColor('statusBarItem.warningBackground') : undefined;
       bar.accessibilityInformation = { label: bar.text.replace(/\$\([^)]+\)/g, '') };
       dashboard.update();
+      // 历史回填有独立字节预算，完成后更新面板，但不阻塞当前速度显示。
+      if (!indexWork && usageIndex) {
+        const index = usageIndex, pending = index.refresh(); indexWork = pending;
+        void pending.then(() => { if (usageIndex === index && !disposed) dashboard.update(); }).finally(() => { if (indexWork === pending) indexWork = undefined; });
+      }
     } catch (error) {
       logger.write(t('Refresh failed: {0}', errorCode(error)));
       bar.text = `$(warning) Codex ${t('Read error')}`;
@@ -140,8 +156,14 @@ export function activate(context: vscode.ExtensionContext): void {
     monitor = undefined;
     state = undefined;
     options = readOptions();
+    if (!usageIndex || indexHome !== options.home) {
+      const previous = usageIndex;
+      usageIndex = new UsageIndex(options.home, path.join(context.globalStorageUri.fsPath, 'usage-history')); indexHome = options.home;
+      void previous?.dispose().catch(() => logger.write(t('History cache shutdown failed')));
+    }
     history = new DashboardHistory();
-    if (!vscode.workspace.getConfiguration('codexSpeed').get<boolean>('enabled', true)) { bar.hide(); dashboard.update(); return; }
+    if (!vscode.workspace.getConfiguration('codexSpeed').get<boolean>('enabled', true)) { bar.hide(); void usageIndex.pause().then(() => dashboard.update()); dashboard.update(); return; }
+    usageIndex.resume();
     monitor = new CodexMonitor(options, message => logger.write(message), Date.now, t);
     logger.write(t('Monitoring started: {0}; Codex Home={1}; scope={2}', host, options.home, options.scope));
     bar.text = `$(sync~spin) Codex ${t('Scanning')}`;
@@ -153,10 +175,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(output, bar, dashboard,
     // 只返回计数及运行状态，供诊断和真实扩展宿主回放使用。
-    vscode.commands.registerCommand('codexSpeed.getDiagnostics', () => ({ state, text: bar.text, home: options.home, remote: vscode.env.remoteName ?? 'local', dashboardVisible: dashboard.visible, dashboardRender: dashboard.lastRender })),
+    vscode.commands.registerCommand('codexSpeed.getDiagnostics', () => ({ state, text: bar.text, home: options.home, remote: vscode.env.remoteName ?? 'local', dashboardVisible: dashboard.visible, dashboardRender: dashboard.lastRender, history: usageIndex?.status })),
     vscode.commands.registerCommand('codexSpeed.showLogs', () => { output.appendLine(t('Diagnostic log file: {0}', logger.file)); output.show(); }),
     vscode.commands.registerCommand('codexSpeed.openSettings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:NO00.vscode-codex-speed')),
-    vscode.commands.registerCommand('codexSpeed.refresh', () => render(true)),
+    vscode.commands.registerCommand('codexSpeed.refresh', () => { void usageIndex?.refresh(true).then(() => dashboard.update()); return render(true); }),
     vscode.commands.registerCommand('codexSpeed.openDashboard', () => { dashboard.show(); }),
     vscode.commands.registerCommand('codexSpeed.showDetails', async () => {
       // 保留既有命令标识供老快捷键使用，状态栏点击直接打开完整仪表盘。
@@ -170,7 +192,7 @@ export function activate(context: vscode.ExtensionContext): void {
       else void render(true);
     }),
     vscode.workspace.onDidChangeWorkspaceFolders(restart),
-    { dispose: () => { disposed = true; if (timer) clearInterval(timer); monitor?.dispose(); void logger.flush(); } }
+    { dispose: () => { disposed = true; if (timer) clearInterval(timer); monitor?.dispose(); void usageIndex?.dispose().catch(() => logger.write(t('History cache shutdown failed'))); void logger.flush(); } }
   );
   configureLanguage();
   restart();

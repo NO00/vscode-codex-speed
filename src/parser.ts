@@ -14,6 +14,16 @@ function count(value: unknown): number | undefined {
 /** 把缺失字段映射为零，但不允许 NaN 或负值污染速率。 */
 function tokens(value: unknown): number { return count(value) ?? 0; }
 
+/** 历史增量读取的解析检查点，只保存元数据、阶段和计数，不保存对话行。 */
+export interface ParserCheckpoint {
+  /** 会话身份及最近工作目录、模型。 */
+  id: string; cwd: string; model: string;
+  /** 未完成调用和流式响应状态。 */
+  phase: Phase; pendingStart?: number; lastEvent: number; created?: number; streaming: boolean; modern: boolean;
+  /** 旧日志的上一份累计计数，仅允许三项数值。 */
+  previous?: { input_tokens: number; output_tokens: number; total_tokens: number };
+}
+
 /** 解析现代及旧版 Codex rollout；仅保留计数、时间、模型和路径。 */
 export class CodexParser implements Session {
   /** 会话日志绝对路径，作为无 session_meta 时的身份回退。 */
@@ -44,7 +54,21 @@ export class CodexParser implements Session {
   private keys = new Set<string>();
 
   /** 创建单文件状态机，不进行任何文件写入。 */
-  constructor(file: string) { this.file = file; this.id = file; }
+  constructor(file: string, private readonly onSample?: (sample: Sample) => void) { this.file = file; this.id = file; }
+
+  /** 在完整换行之后保存断点，下一次启动可直接从已提交字节偏移继续。 */
+  checkpoint(): ParserCheckpoint {
+    return { id: this.id, cwd: this.cwd, model: this.model, phase: this.phase, pendingStart: this.pendingStart, lastEvent: this.lastEvent,
+      created: this.created, streaming: this.streaming, modern: this.modern,
+      previous: this.previous ? { input_tokens: tokens(this.previous.input_tokens), output_tokens: tokens(this.previous.output_tokens), total_tokens: tokens(this.previous.total_tokens) } : undefined };
+  }
+
+  /** 只恢复解析状态，近期速度样本仍按实时读取器的原有规则积累。 */
+  restore(state: ParserCheckpoint): void {
+    this.id = state.id; this.cwd = state.cwd; this.model = state.model; this.phase = state.phase;
+    this.pendingStart = state.pendingStart; this.lastEvent = state.lastEvent; this.created = state.created;
+    this.streaming = state.streaming; this.modern = state.modern; this.previous = state.previous;
+  }
 
   /** 只读取大文件开头的元数据，不把早期用量混入尾部时间线。 */
   seedMetadata(line: string): void {
@@ -137,7 +161,9 @@ export class CodexParser implements Session {
   private add(key: string, usage: Record<string, unknown>, time: number): void {
     if (this.keys.has(key)) return;
     this.keys.add(key);
-    this.samples.push({ key, start: this.pendingStart, end: time, output: tokens(usage.output_tokens), input: tokens(usage.input_tokens), model: this.model });
+    const sample = { key, start: this.pendingStart, end: time, output: tokens(usage.output_tokens), input: tokens(usage.input_tokens), model: this.model };
+    this.samples.push(sample);
+    this.onSample?.(sample);
     this.endResponse(time);
     while (this.samples.length > 1000 || (this.samples[0] && this.samples[0].end < time - 1800000)) {
       const old = this.samples.shift();

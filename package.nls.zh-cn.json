@@ -1,4 +1,9 @@
 {
+  "config.usageRange": "仪表盘用量时间范围。今天按仪表盘客户端时区划分；历史 JSONL 用量在扩展存储目录中建立索引并缓存，最多保留 30 天。首次回填需要一些时间。",
+  "config.usageRange.30m": "最近 30 分钟。",
+  "config.usageRange.today": "VS Code 客户端时区的今天（默认）。",
+  "config.usageRange.7d": "最近 7 × 24 小时。",
+  "config.usageRange.30d": "最近 30 × 24 小时。",
   "command.openDashboard": "Codex Speed: 打开仪表盘",
   "config.language": "状态栏、悬浮摘要、仪表盘和诊断提示的语言，切换后立即生效。命令面板标题和设置说明跟随 VS Code 显示语言。",
   "config.language.auto": "跟随 VS Code 显示语言；未支持的语言使用英文。",
