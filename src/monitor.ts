@@ -3,6 +3,7 @@ import path from 'node:path';
 import { calculate } from './engine';
 import { TranscriptTailer } from './tailer';
 import { Log, MonitorOptions, Snapshot } from './types';
+import { formatMessage, Translate } from './localization';
 
 /** 扫描文件及目录总量的硬上限，防止异常数据目录造成无界遍历。 */
 const DISCOVERY_LIMIT = 20000;
@@ -44,7 +45,7 @@ export class CodexMonitor {
   private disposed = false;
 
   /** 注入配置、诊断接口和确定性时钟，便于文件追加回放。 */
-  constructor(readonly options: MonitorOptions, private readonly log: Log, private readonly clock: () => number = Date.now) {}
+  constructor(readonly options: MonitorOptions, private readonly log: Log, private readonly clock: () => number = Date.now, private readonly t: Translate = formatMessage) {}
 
   /** 串行刷新，目录缺失时继续重试，允许 Codex 之后首次启动。 */
   tick(force = false): Promise<MonitorState> {
@@ -69,11 +70,11 @@ export class CodexMonitor {
       try { await tailer.poll(); }
       catch (error) {
         if (errorCode(error) === 'ENOENT') this.tailers.delete(file);
-        else { readErrors++; this.log(`读取会话失败：${errorCode(error)}`); }
+        else { readErrors++; this.log(this.t('Failed to read session: {0}', errorCode(error))); }
       }
     }
     const snapshot = calculate([...this.tailers.values()].map(t => t.parser), this.options, this.clock());
-    return { snapshot, notice: readErrors ? `${readErrors} 个日志无法读取，请检查服务器权限` : this.notice, error: this.error || readErrors > 0, limited: this.limited };
+    return { snapshot, notice: readErrors ? this.t('Cannot read {0} log files. Check permissions on this host.', readErrors) : this.notice, error: this.error || readErrors > 0, limited: this.limited };
   }
 
   /** 不跟随符号链接的有界发现；按 mtime 选择，因此恢复旧会话也可被发现。 */
@@ -116,17 +117,17 @@ export class CodexMonitor {
       for (const file of this.tailers.keys()) if (!selected.has(file)) this.tailers.delete(file);
       for (const file of selected) if (!this.tailers.has(file)) this.tailers.set(file, new TranscriptTailer(file));
       this.error = failures > 0;
-      this.setNotice(failures ? `${failures} 个目录或文件无法扫描，请检查权限` : candidates.length ? '' : '暂无近期 Codex 日志；请在此服务器运行 Codex');
+      this.setNotice(failures ? this.t('Cannot scan {0} directories or files. Check permissions.', failures) : candidates.length ? '' : this.t('No recent Codex logs. Run Codex on this host.'));
     } catch (error) {
       this.error = true;
       this.tailers.clear();
-      this.setNotice(errorCode(error) === 'ENOENT' ? '未找到 sessions 目录，请设置服务器上的 Codex Home' : `无法扫描 Codex 目录：${errorCode(error)}`);
+      this.setNotice(errorCode(error) === 'ENOENT' ? this.t('Sessions directory not found. Set Codex Home on this host.') : this.t('Cannot scan the Codex directory: {0}', errorCode(error)));
     }
   }
 
   /** 只在运行提示发生变化时写日志，避免持续轮询刷屏。 */
   private setNotice(notice: string): void {
-    if (notice !== this.notice) this.log(notice || `已发现 ${this.tailers.size} 个会话日志`);
+    if (notice !== this.notice) this.log(notice || this.t('Found {0} session logs.', this.tailers.size));
     this.notice = notice;
   }
 }

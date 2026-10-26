@@ -1,8 +1,8 @@
 {
   "name": "vscode-codex-speed",
   "displayName": "VSCode Codex Speed",
-  "description": "Monitor Codex output token/s in the VS Code status bar, including Remote SSH. 在状态栏查看 Codex 输出速度。",
-  "version": "0.1.2",
+  "description": "%extension.description%",
+  "version": "0.1.3",
   "publisher": "NO00",
   "icon": "assets/icon.png",
   "galleryBanner": {
@@ -37,6 +37,7 @@
     "onStartupFinished"
   ],
   "main": "./dist/src/extension.js",
+  "l10n": "./l10n",
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": true
@@ -47,34 +48,42 @@
     "commands": [
       {
         "command": "codexSpeed.showDetails",
-        "title": "Codex Speed: 查看测速详情"
+        "title": "%command.showDetails%"
       },
       {
         "command": "codexSpeed.refresh",
-        "title": "Codex Speed: 重新扫描日志"
+        "title": "%command.refresh%"
       },
       {
         "command": "codexSpeed.openSettings",
-        "title": "Codex Speed: 打开设置"
+        "title": "%command.openSettings%"
       },
       {
         "command": "codexSpeed.showLogs",
-        "title": "Codex Speed: 查看诊断日志"
+        "title": "%command.showLogs%"
       }
     ],
     "configuration": {
       "title": "VSCode Codex Speed",
       "properties": {
+        "codexSpeed.language": {
+          "type": "string",
+          "enum": ["auto", "en", "zh-cn", "zh-tw"],
+          "enumDescriptions": ["%config.language.auto%", "English", "简体中文", "繁體中文"],
+          "default": "auto",
+          "description": "%config.language%",
+          "scope": "machine"
+        },
         "codexSpeed.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "启用 Codex 日志测速。",
+          "description": "%config.enabled%",
           "scope": "machine"
         },
         "codexSpeed.codexHome": {
           "type": "string",
           "default": "",
-          "description": "当前扩展宿主上的 Codex 数据目录。空值依次使用 CODEX_HOME、~/.codex；支持 ~/。请填写 .codex 目录而非 sessions 子目录。",
+          "description": "%config.codexHome%",
           "scope": "machine"
         },
         "codexSpeed.scope": {
@@ -85,10 +94,10 @@
           ],
           "default": "all",
           "enumDescriptions": [
-            "汇总此主机的近期会话，包括子 agent。",
-            "仅汇总 cwd 位于当前工作区中的会话。"
+            "%config.scope.all%",
+            "%config.scope.workspace%"
           ],
-          "description": "选择需要统计的会话范围。",
+          "description": "%config.scope%",
           "scope": "machine"
         },
         "codexSpeed.pollIntervalMs": {
@@ -96,7 +105,7 @@
           "default": 1000,
           "minimum": 500,
           "maximum": 10000,
-          "description": "日志增量读取和状态栏刷新间隔（毫秒）。",
+          "description": "%config.pollIntervalMs%",
           "scope": "machine"
         },
         "codexSpeed.scanDays": {
@@ -104,13 +113,13 @@
           "default": 3,
           "minimum": 1,
           "maximum": 30,
-          "description": "扫描最近多少天的日期目录；仍会继续跟踪已发现的旧会话。",
+          "description": "%config.scanDays%",
           "scope": "machine"
         },
         "codexSpeed.showEstimates": {
           "type": "boolean",
           "default": true,
-          "description": "生成中使用近期实测速率估算，并在数字前显示 ~。关闭后生成中等待新的实测记录。",
+          "description": "%config.showEstimates%",
           "scope": "machine"
         }
       }

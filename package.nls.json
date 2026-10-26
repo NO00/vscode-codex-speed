@@ -1,0 +1,17 @@
+{
+  "config.language": "Language for the status bar, hover details, action menu and diagnostic messages. Applies immediately. Command Palette titles and Settings descriptions follow the VS Code display language.",
+  "config.language.auto": "Follow the VS Code display language (use English for unsupported languages).",
+  "extension.description": "Monitor Codex output token/s in the VS Code status bar, including Remote SSH.",
+  "command.showDetails": "Codex Speed: Show Speed Details",
+  "command.refresh": "Codex Speed: Rescan Logs",
+  "command.openSettings": "Codex Speed: Open Settings",
+  "command.showLogs": "Codex Speed: Show Diagnostic Logs",
+  "config.enabled": "Enable Codex log speed monitoring.",
+  "config.codexHome": "Codex data directory on this extension host. When empty, use CODEX_HOME, then ~/.codex. Supports ~/. Set the .codex directory, not its sessions subdirectory.",
+  "config.scope.all": "Aggregate recent sessions on this host, including subagents.",
+  "config.scope.workspace": "Only include sessions whose cwd is inside the current workspace.",
+  "config.scope": "Choose which sessions to include.",
+  "config.pollIntervalMs": "Interval for reading log updates and refreshing the status bar, in milliseconds.",
+  "config.scanDays": "Discover logs modified within this many days; already discovered older sessions remain tracked.",
+  "config.showEstimates": "Estimate generation speed from recent measured rates and prefix it with ~. When disabled, wait for new measured counts during generation."
+}

@@ -1,0 +1,17 @@
+{
+  "config.language": "狀態列、懸浮詳細資料、操作選單和診斷提示的語言，切換後立即生效。命令選擇區標題和設定說明跟隨 VS Code 顯示語言。",
+  "config.language.auto": "跟隨 VS Code 顯示語言；未支援的語言使用英文。",
+  "extension.description": "在 VS Code 狀態列查看 Codex 輸出 token/s，支援 Remote SSH。",
+  "command.showDetails": "Codex Speed: 查看測速詳細資料",
+  "command.refresh": "Codex Speed: 重新掃描日誌",
+  "command.openSettings": "Codex Speed: 開啟設定",
+  "command.showLogs": "Codex Speed: 查看診斷日誌",
+  "config.enabled": "啟用 Codex 日誌測速。",
+  "config.codexHome": "目前擴充功能宿主上的 Codex 資料目錄。留空時依序使用 CODEX_HOME、~/.codex；支援 ~/。請填寫 .codex 目錄，而非 sessions 子目錄。",
+  "config.scope.all": "彙總此主機的近期工作階段，包括子 agent。",
+  "config.scope.workspace": "僅彙總 cwd 位於目前工作區中的工作階段。",
+  "config.scope": "選擇需要統計的工作階段範圍。",
+  "config.pollIntervalMs": "日誌增量讀取和狀態列更新間隔（毫秒）。",
+  "config.scanDays": "尋找最近多少天內更新的日誌；仍會繼續追蹤已找到的舊工作階段。",
+  "config.showEstimates": "生成中使用近期實測速率估算，並在數字前顯示 ~。關閉後在生成中等待新的實測記錄。"
+}

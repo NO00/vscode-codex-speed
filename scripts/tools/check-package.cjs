@@ -50,11 +50,22 @@ async function main() {
   assert.ok(icon.readUInt32BE(16) >= 128 && icon.readUInt32BE(20) >= 128, '图标尺寸不能小于 128×128');
   assert.ok(entries.get('extension.vsixmanifest').toString('utf8').includes('Microsoft.VisualStudio.Services.Icons.Default'), '市场清单必须包含插件图标资源');
   assert.ok(entries.has('extension/LICENSE.txt'));
+  assert.equal(manifest.l10n, './l10n', '必须声明运行时翻译目录');
+  // 检查最终包中的语言资源，避免本地可用但发布时被忽略。
+  const keys = [...JSON.stringify(manifest).matchAll(/%([\w.]+)%/g)].map(match => match[1]);
+  for (const suffix of ['', '.zh-cn', '.zh-tw']) {
+    const bundle = JSON.parse(entries.get(`extension/package.nls${suffix}.json`).toString('utf8'));
+    for (const key of keys) assert.ok(bundle[key], `清单翻译缺失：${suffix} ${key}`);
+  }
+  for (const locale of ['zh-cn', 'zh-tw']) {
+    const bundle = JSON.parse(entries.get(`extension/l10n/bundle.l10n.${locale}.json`).toString('utf8'));
+    assert.ok(bundle.Last && bundle['Read error'], `运行时翻译缺失：${locale}`);
+  }
   assert.ok([...entries.keys()].every(file => !file.includes('/tests/') && !file.includes('/node_modules/') && !file.includes('/logs/')));
   assert.ok([...entries.values()].every(content => !content.includes('CODEX_SPEED_TEST_HOME')));
   const sha256 = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
   fs.writeFileSync(`${file}.sha256`, `${sha256}  ${sourceManifest.name}-${sourceManifest.version}.vsix\n`);
-  console.log(`VSIX 验证通过：${entries.size} 个文件，Publisher=${manifest.publisher}，版本=${manifest.version}，路径全部为 ASCII 且无重名，入口、PNG 图标和中英文市场首页完整。`);
+  console.log(`VSIX 验证通过：${entries.size} 个文件，Publisher=${manifest.publisher}，版本=${manifest.version}，路径全部为 ASCII 且无重名，入口、PNG 图标、中英文市场首页及界面翻译完整。`);
   console.log(`SHA-256: ${sha256}`);
 }
 

@@ -4,7 +4,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { row } from '../helpers';
 import { MonitorState } from '../../src/monitor';
-import { statusText, resolveHome } from '../../src/extension';
+import { statusText, resolveHome, tooltip } from '../../src/extension';
 
 /** 真实扩展宿主的只读诊断返回结构。 */
 interface Diagnostics {
@@ -36,6 +36,15 @@ export async function run(): Promise<void> {
     assert.ok(extension, '扩展必须被 VS Code 发现');
     assert.deepEqual(extension.packageJSON.extensionKind, ['workspace']);
     await extension.activate();
+    const locale = process.env.CODEX_SPEED_TEST_LOCALE || 'en';
+    assert.equal(vscode.env.language, locale, '宿主必须实际采用指定的客户端语言');
+    const chinese = locale === 'zh-cn' || locale === 'zh-tw';
+    const traditional = locale === 'zh-tw';
+    assert.equal(vscode.l10n.t('Last'), chinese ? '上次' : 'Last');
+    assert.equal(vscode.l10n.t('Read error'), chinese ? traditional ? '讀取異常' : '读取异常' : 'Read error');
+    const commandTitle = extension.packageJSON.contributes.commands.find((item: { command: string }) => item.command === 'codexSpeed.showDetails').title;
+    // 本地化命令标题在宿主描述中可能保留 value/original，以便同时搜索英文。
+    assert.equal(typeof commandTitle === 'string' ? commandTitle : commandTitle.value, chinese ? traditional ? 'Codex Speed: 查看測速詳細資料' : 'Codex Speed: 查看测速详情' : 'Codex Speed: Show Speed Details');
     assert.equal(resolveHome('~/.codex', {}, '/remote-user'), path.resolve('/remote-user', '.codex'));
     const file = path.join(home, 'sessions', 'rollout-test.jsonl');
     let now = Date.now();
@@ -49,23 +58,41 @@ export async function run(): Promise<void> {
     const measured = await waitFor(d => d.state?.snapshot.output === 300);
     assert.equal(measured.home, home);
     assert.match(measured.text, /tok\/s/);
+    const tip = tooltip(measured.state!, { home, scanDays: 3, scope: 'all', workspaces: [], showEstimates: true, pollIntervalMs: 500 }, 'ssh-remote / test-host').value.replace(/&nbsp;/g, ' ');
+    assert.ok(tip.includes(chinese ? '宿主' : 'Host'));
+    assert.ok(tip.includes(chinese ? traditional ? '輸出速度' : '输出速度' : 'Output speed'));
+    assert.ok(tip.includes(chinese ? '估算' : 'estimates'));
+    assert.ok(!tip.includes(chinese ? 'Output speed' : '输出速度'));
     now = Date.now();
     await fs.appendFile(file, row(now, 'event_msg', { type: 'task_started' }) + '\n');
     const estimated = await waitFor(d => d.state?.snapshot.kind === 'estimated');
     assert.match(estimated.text, /~/);
     await vscode.workspace.getConfiguration('codexSpeed').update('showEstimates', false, vscode.ConfigurationTarget.Global);
     const waiting = await waitFor(d => d.state?.snapshot.kind === 'waiting');
-    assert.match(waiting.text, /等待计数/);
+    assert.ok(waiting.text.includes(chinese ? traditional ? '等待計數' : '等待计数' : 'Waiting for counts'));
+    // 在仍有计数的同一会话内覆盖和恢复语言，确认立即生效且不丢失测速状态。
+    for (const [selected, expected] of [['zh-cn', '等待计数'], ['zh-tw', '等待計數'], ['en', 'Waiting for counts'], ['auto', chinese ? traditional ? '等待計數' : '等待计数' : 'Waiting for counts']]) {
+      await vscode.workspace.getConfiguration('codexSpeed').update('language', selected, vscode.ConfigurationTarget.Global);
+      const changed = await waitFor(d => d.text.includes(expected!));
+      assert.equal(changed.state?.snapshot.output, 300);
+      assert.equal(extension.packageJSON.contributes.commands[0].title, commandTitle, '手动语言不改变 VS Code 原生清单标题');
+    }
     now = Date.now();
     await fs.appendFile(file, row(now, 'token_usage_record', { response_id: 'two', usage: { output_tokens: 120 } }) + '\n' + row(now + 1, 'event_msg', { type: 'task_complete' }) + '\n');
     await waitFor(d => d.state?.snapshot.output === 420);
     const empty = { snapshot: { rate: 0, kind: 'idle' as const, active: 0, sessions: 0, responses: 0, output: 0, latest: undefined }, notice: '', error: true, limited: false };
     assert.match(statusText(empty), /warning/);
     await vscode.workspace.getConfiguration('codexSpeed').update('codexHome', path.join(home, 'missing'), vscode.ConfigurationTarget.Global);
-    await waitFor(d => d.state?.error === true);
+    const missing = await waitFor(d => d.state?.error === true);
+    assert.ok(missing.state?.notice.includes(chinese ? traditional ? '找不到 sessions' : '未找到 sessions' : 'Sessions directory not found'));
+    await vscode.workspace.getConfiguration('codexSpeed').update('language', 'zh-tw', vscode.ConfigurationTarget.Global);
+    await waitFor(d => d.state?.notice.includes('找不到 sessions') === true);
+    await vscode.workspace.getConfiguration('codexSpeed').update('language', 'en', vscode.ConfigurationTarget.Global);
+    await waitFor(d => d.state?.notice.includes('Sessions directory not found') === true);
+    await vscode.workspace.getConfiguration('codexSpeed').update('language', 'auto', vscode.ConfigurationTarget.Global);
     await vscode.workspace.getConfiguration('codexSpeed').update('codexHome', home, vscode.ConfigurationTarget.Global);
     await waitFor(d => d.state?.snapshot.output === 420 && !d.state.error);
-    await fs.writeFile(report, JSON.stringify({ ok: true, checks: ['真实宿主加载', 'workspace 远程部署声明', '日志发现与状态栏文字', '实测/估算/等待切换', '配置变更重启', '增量输出去重', '路径错误与恢复'] }));
+    await fs.writeFile(report, JSON.stringify({ ok: true, locale: vscode.env.language, checks: ['真实宿主加载', 'workspace 远程部署声明', '日志发现与状态栏文字', '实测/估算/等待切换', '配置变更重启', '增量输出去重', '路径错误与恢复', '客户端语言及原生翻译加载', '悬浮提示及错误提示翻译', '手动切换四种语言选项并保留用量', '错误提示随手动语言切换'] }));
   } catch (error) {
     await fs.writeFile(report, JSON.stringify({ ok: false, error: error instanceof Error ? error.stack : String(error) }));
     throw error;

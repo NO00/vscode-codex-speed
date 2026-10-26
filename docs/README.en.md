@@ -8,12 +8,20 @@ Monitor **Codex output tokens per second on a Remote SSH server** from the VS Co
 
 The extension runs as a `workspace` extension. In a remote window, it reads Codex logs directly on the remote extension host, using that host's user account. No additional SSH credentials or log synchronization are needed.
 
-> This is an independent extension, not an official OpenAI extension or part of Agent Speed. The current extension UI is in Simplified Chinese; this document explains its labels in English.
+> This is an independent extension, not an official OpenAI extension or part of Agent Speed.
+
+## Interface language
+
+Since 0.1.3, the UI follows the VS Code client display language. English, Simplified Chinese and Traditional Chinese are supported; other languages fall back to English. Remote SSH uses the client's display language, not the server's system locale.
+
+Set `codexSpeed.language` to `auto` (default), `en`, `zh-cn` or `zh-tw` in User or Remote settings, for example `"codexSpeed.language": "en"`. Manual changes immediately update the status bar, hover details, action menu and diagnostic messages without reloading or resetting usage counts.
+
+Command Palette titles and Settings descriptions always follow the VS Code display language. Restart VS Code when prompted after changing its display language.
 
 ## Install in a Remote SSH window
 
 1. Connect to your server using **Remote - SSH** and open a remote folder.
-2. Open the Command Palette and run **Extensions: Install from VSIX...**. Select `vscode-codex-speed-0.1.2.vsix`.
+2. Open the Command Palette and run **Extensions: Install from VSIX...**. Select `vscode-codex-speed-0.1.3.vsix`.
 3. Confirm that **VSCode Codex Speed** appears under **SSH: your-server — Installed** in the Extensions view. If it is installed only locally, select **Install in SSH: your-server**. Run **Developer: Reload Window** if needed.
 4. Run Codex on the server as the same user. The status bar will show `Codex … tok/s`. New sessions are normally discovered within about five seconds, and existing logs are polled every second by default. Click the item to refresh, view details, or open settings.
 
@@ -44,20 +52,20 @@ All settings use VS Code's machine scope. Set them in User or Remote settings ra
 
 ## Understand the status bar
 
-The examples below preserve the Chinese labels shown by the current UI.
+The examples below show the English UI. Chinese labels are used when that language is selected.
 
 | Display | Meaning |
 | --- | --- |
 | `Codex 85.0 tok/s` | Output rate derived from completed response records within the trailing three-second window |
 | `Codex ~85.0 tok/s` | Generation is in progress; the rate includes an estimate based on this session's latest three measured responses |
-| `Codex -- tok/s · 等待计数` | Waiting for usage counts: generation is in progress, but no speed reference is available or estimates are disabled |
-| `Codex 85.0 tok/s · 上次` | Last completed call's average speed, retained for up to 15 seconds; this is not the current live rate |
-| `Codex 0.0 tok/s · 工具中` | The model has finished a response and is waiting for tool results |
+| `Codex -- tok/s · Waiting for counts` | Waiting for usage counts: generation is in progress, but no speed reference is available or estimates are disabled |
+| `Codex 85.0 tok/s · Last` | Last completed call's average speed, retained for up to 15 seconds; this is not the current live rate |
+| `Codex 0.0 tok/s · Tools` | The model has finished a response and is waiting for tool results |
 | `Codex 0.0 tok/s` | Idle |
 | `Codex -- tok/s` | No matching sessions; hover for the configured path and diagnostic information |
-| `Codex 日志` with a warning icon | Missing directory, insufficient permissions, or another log-reading error; hover for details |
+| `Codex Logs` with a warning icon | Missing directory, insufficient permissions, or another log-reading error; hover for details |
 
-When multiple sessions are generating, the item includes `· N agents`. The suffix `· 部分` means a scan limit was reached and the displayed data is partial.
+When multiple sessions are generating, the item includes `· N agents`. The suffix `· Partial` means a scan limit was reached and the displayed data is partial.
 
 **The logs do not provide token-by-token live counts.** Here, “live” means continuous monitoring and display updates. During generation, `~` marks an estimate based on previous measured speeds. Completed usage records replace that estimate with a rate derived from token counts and log timestamps. An estimated value is not a count of tokens actually produced in the current second. Disable `showEstimates` to wait for measured results instead.
 
@@ -69,6 +77,7 @@ If an end event is missing, a session can retain its generation estimate until f
 
 | Setting | Default | Description |
 | --- | --- | --- |
+| `codexSpeed.language` | `auto` | Follow VS Code, or override the runtime UI with `en`, `zh-cn` or `zh-tw`; applies immediately |
 | `codexSpeed.enabled` | `true` | Enable monitoring |
 | `codexSpeed.codexHome` | Empty | Automatically resolve the Codex data directory |
 | `codexSpeed.scope` | `all` | Monitor `all` recent host sessions or only the current `workspace` |
@@ -78,10 +87,10 @@ If an end event is missing, a session can retain its generation estimate until f
 
 The Command Palette provides these commands:
 
-- **Codex Speed: 查看测速详情** — Show speed details.
-- **Codex Speed: 重新扫描日志** — Rescan logs.
-- **Codex Speed: 打开设置** — Open settings.
-- **Codex Speed: 查看诊断日志** — Show diagnostic logs.
+- **Codex Speed: Show Speed Details** — Show speed details.
+- **Codex Speed: Rescan Logs** — Rescan logs.
+- **Codex Speed: Open Settings** — Open settings.
+- **Codex Speed: Show Diagnostic Logs** — Show diagnostic logs.
 
 Diagnostic logs record operational messages, paths, and operating-system error codes. They are written to `logs/codex-speed.log` under VS Code's extension log directory and rotate after approximately 1 MiB. Click the status item and choose speed details to see the file location.
 
@@ -117,7 +126,7 @@ If no executable path is supplied, `@vscode/test-electron` downloads a separate 
 
 For a Windows installation using version subdirectories, an updater lock may prevent a new instance from starting. Use `bash scripts/host-test.sh --copy-installed "/path/to/VS Code"` to create an isolated copy under `.vscode-test/isolated-installed`. Only that copy's product metadata is adjusted to disable Windows installer update coordination; the original installation remains read-only. This tests the installed version, not necessarily the minimum supported version.
 
-The package is generated at `artifacts/vscode-codex-speed-0.1.2.vsix`. Starting with 0.1.2, `docs/MARKETPLACE.md` supplies the bilingual user-facing Marketplace overview, and `assets/icon.png` supplies the extension's own icon. The detailed Chinese/English README files remain in the repository. No Node.js dependency installation is required on the server. All VSIX paths use ASCII characters for upload compatibility. Architecture and validation documents remain in the source repository at `docs/设计说明.md` and `docs/验证记录.md`.
+The package is generated at `artifacts/vscode-codex-speed-0.1.3.vsix`. Starting with 0.1.2, `docs/MARKETPLACE.md` supplies the bilingual user-facing Marketplace overview, and `assets/icon.png` supplies the extension's own icon. Version 0.1.3 includes manifest and runtime translations. The detailed Chinese/English README files remain in the repository. No Node.js dependency installation is required on the server. All VSIX paths use ASCII characters for upload compatibility. Architecture and validation documents remain in the source repository at `docs/设计说明.md` and `docs/验证记录.md`.
 
 Run `bash scripts/check-package.sh` to inspect an existing package, optionally passing a VSIX path. Checks reject duplicate paths after lossy ASCII conversion, non-ASCII paths, incorrect publisher/version metadata, and missing entry points or user documentation.
 

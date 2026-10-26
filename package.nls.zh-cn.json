@@ -1,0 +1,17 @@
+{
+  "config.language": "状态栏、悬浮详情、操作菜单和诊断提示的语言，切换后立即生效。命令面板标题和设置说明跟随 VS Code 显示语言。",
+  "config.language.auto": "跟随 VS Code 显示语言；未支持的语言使用英文。",
+  "extension.description": "在 VS Code 状态栏查看 Codex 输出 token/s，支持 Remote SSH。",
+  "command.showDetails": "Codex Speed: 查看测速详情",
+  "command.refresh": "Codex Speed: 重新扫描日志",
+  "command.openSettings": "Codex Speed: 打开设置",
+  "command.showLogs": "Codex Speed: 查看诊断日志",
+  "config.enabled": "启用 Codex 日志测速。",
+  "config.codexHome": "当前扩展宿主上的 Codex 数据目录。空值依次使用 CODEX_HOME、~/.codex；支持 ~/。请填写 .codex 目录而非 sessions 子目录。",
+  "config.scope.all": "汇总此主机的近期会话，包括子 agent。",
+  "config.scope.workspace": "仅汇总 cwd 位于当前工作区中的会话。",
+  "config.scope": "选择需要统计的会话范围。",
+  "config.pollIntervalMs": "日志增量读取和状态栏刷新间隔（毫秒）。",
+  "config.scanDays": "发现最近多少天内更新的日志；仍会继续跟踪已发现的旧会话。",
+  "config.showEstimates": "生成中使用近期实测速率估算，并在数字前显示 ~。关闭后生成中等待新的实测记录。"
+}

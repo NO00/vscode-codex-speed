@@ -21,7 +21,9 @@ Codex 85.0 tok/s · 上次   最近一次调用 / Last completed call
 - 汇总多个会话和子 agent，也可以只查看当前工作区中的会话。
 - 点击状态栏即可查看详情、重新扫描或调整设置。
 
-这是独立的社区扩展。当前界面为简体中文，不属于 OpenAI 官方产品。
+这是独立的社区扩展，不属于 OpenAI 官方产品。界面默认跟随 VS Code 显示语言，支持英文、简体中文和繁体中文；其他语言使用英文。
+
+设置 `codexSpeed.language` 可选 `auto`（默认）、`en`、`zh-cn` 或 `zh-tw`。手动切换立即更新状态栏、悬浮提示、操作菜单及诊断提示，无需重载。Remote SSH 跟随客户端语言，手动选择请写入远程设置。命令面板标题和设置说明始终跟随 VS Code 显示语言。
 
 ### 安装后怎么用
 
@@ -57,6 +59,7 @@ Codex 85.0 tok/s · 上次   最近一次调用 / Last completed call
 
 | 设置 | 默认值 | 用途 |
 | --- | --- | --- |
+| `codexSpeed.language` | `auto` | 跟随 VS Code，或手动选择 `en`、`zh-cn`、`zh-tw`，立即生效 |
 | `codexSpeed.scope` | `all` | 改为 `workspace`，仅查看当前工作区中的会话 |
 | `codexSpeed.showEstimates` | `true` | 改为 `false`，生成中等待完成记录再显示实测结果 |
 | `codexSpeed.pollIntervalMs` | `1000` | 刷新间隔（毫秒）；可调为 `3000`，降低轮询频率 |
@@ -81,7 +84,9 @@ Codex 85.0 tok/s · 上次   最近一次调用 / Last completed call
 - Combined readings for multiple sessions and subagents, or a view limited to your workspace folders.
 - One-click access to details, rescanning, and settings.
 
-This is an independent community extension. The current UI uses Simplified Chinese; it is not an official OpenAI product.
+This is an independent community extension, not an official OpenAI product. The UI follows the VS Code display language by default. English, Simplified Chinese and Traditional Chinese are supported; other languages fall back to English.
+
+Set `codexSpeed.language` to `auto` (default), `en`, `zh-cn` or `zh-tw` in User or Remote settings. Manual changes immediately update the status bar, hover details, action menu and diagnostic messages without reloading. Remote SSH follows the client's display language, not the server's system locale. Command Palette titles and Settings descriptions always follow VS Code's display language.
 
 ### Get started
 
@@ -99,9 +104,9 @@ For a custom data directory, set `codexSpeed.codexHome` in VS Code **User or Rem
 | --- | --- |
 | `85.0 tok/s` | Rate derived from completed response records over the trailing three-second window |
 | `~85.0 tok/s` | Generation estimate based on this session's recent measured calls |
-| `等待计数` | Waiting for usage counts; no reference is available or estimates are disabled |
-| `上次` | Last completed call's rate, retained for up to about 15 seconds |
-| `工具中` / `0.0 tok/s` | Waiting for tool results, or idle |
+| `Waiting for counts` | Waiting for usage counts; no reference is available or estimates are disabled |
+| `Last` | Last completed call's rate, retained for up to about 15 seconds |
+| `Tools` / `0.0 tok/s` | Waiting for tool results, or idle |
 
 **A rate marked with `~` is an estimate, not token-by-token telemetry.** Completed Codex records update it using actual counts and log timestamps. Duration includes time to first token; output includes reasoning. This differs from a model server's internal decoding rate.
 
@@ -111,6 +116,7 @@ The default host-wide scope includes other sessions, even when the chat you are 
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
+| `codexSpeed.language` | `auto` | Follow VS Code or manually select `en`, `zh-cn` or `zh-tw`; applies immediately |
 | `codexSpeed.scope` | `all` | Use `workspace` to include only sessions inside the current workspace folders |
 | `codexSpeed.showEstimates` | `true` | Set to `false` to wait for completed usage records rather than show generation estimates |
 | `codexSpeed.pollIntervalMs` | `1000` | Poll interval in milliseconds; use `3000` for less frequent polling |
@@ -118,7 +124,7 @@ The default host-wide scope includes other sessions, even when the chat you are 
 
 ### Troubleshooting
 
-Hover over the status item for a diagnostic message, or run **Codex Speed: 查看诊断日志** from the Command Palette. Check that the extension and Codex run on the same host and that the extension user can read the logs. Point `codexHome` to the data directory, not the `sessions` folder. This version reads uncompressed session JSONL only.
+Hover over the status item for a diagnostic message, or run **Codex Speed: Show Diagnostic Logs** from the Command Palette. Check that the extension and Codex run on the same host and that the extension user can read the logs. Point `codexHome` to the data directory, not the `sessions` folder. This version reads uncompressed session JSONL only.
 
 If upgrading from an old `local-codex-tools` build, uninstall that extension first to avoid duplicate status items. Existing `codexSpeed.*` settings remain compatible.
 
