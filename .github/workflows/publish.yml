@@ -1,21 +1,16 @@
-name: 发布到 VS Code Marketplace
+name: 构建 Release 安装包
 
 on:
   release:
     types: [published]
   workflow_dispatch:
-    inputs:
-      verify_oidc:
-        description: 额外验证 Marketplace 可信绑定（不发布插件）
-        type: boolean
-        default: false
 
 permissions:
   contents: read
 
-# 同时只发布一个版本；手动预检与正式发布使用独立队列。
+# 正式 Release 与手动预检使用独立队列。
 concurrency:
-  group: marketplace-${{ github.event_name }}
+  group: release-package-${{ github.event_name }}
   cancel-in-progress: false
 
 jobs:
@@ -26,8 +21,6 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
-    outputs:
-      artifact_name: ${{ steps.metadata.outputs.artifact_name }}
     env:
       RELEASE_TAG: ${{ github.event.release.tag_name }}
       RELEASE_IS_PRERELEASE: ${{ github.event.release.prerelease }}
@@ -65,67 +58,3 @@ jobs:
         run: bash scripts/release/upload.sh
         env:
           GH_TOKEN: ${{ github.token }}
-      - name: 说明尚未启用的市场发布
-        if: github.event_name == 'release' && vars.MARKETPLACE_OIDC_ENABLED != 'true'
-        run: bash scripts/release/status.sh
-
-  publish:
-    name: 通过 OIDC 发布到 Marketplace
-    needs: build
-    if: github.event_name == 'release' && github.event.release.prerelease == false && vars.MARKETPLACE_OIDC_ENABLED == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment:
-      name: marketplace
-      url: https://marketplace.visualstudio.com/items?itemName=NO00.vscode-codex-speed
-    permissions:
-      contents: read
-      id-token: write
-    env:
-      RELEASE_TAG: ${{ github.event.release.tag_name }}
-      RELEASE_IS_PRERELEASE: ${{ github.event.release.prerelease }}
-    steps:
-      - name: 检出相同的发布标签
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ github.event.release.tag_name }}
-          persist-credentials: false
-      - name: 设置 Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: '22'
-          cache: npm
-      - name: 安装发布工具
-        run: bash scripts/setup.sh
-      - name: 下载已经测试的安装包
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ${{ needs.build.outputs.artifact_name }}
-          path: artifacts
-      - name: 校验并发布同一个 VSIX
-        run: bash scripts/release/publish.sh
-
-  verify-auth:
-    name: 验证可信发布绑定（不发布）
-    needs: build
-    if: github.event_name == 'workflow_dispatch' && inputs.verify_oidc
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment: marketplace
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: 检出预检分支
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-      - name: 设置 Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: '22'
-          cache: npm
-      - name: 安装身份验证工具
-        run: bash scripts/setup.sh
-      - name: 仅验证短期凭证交换
-        run: bash scripts/release/check-oidc.sh

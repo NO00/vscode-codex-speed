@@ -104,7 +104,7 @@ Windows 真实宿主测试示例：
 
 `bash scripts/check-package.sh` 可独立校验现有安装包；也可在命令末尾传入待检查的 VSIX 路径。检查包括路径编码退化后的重名、非 ASCII 路径、实际 Publisher、版本、入口和中英文使用说明。
 
-正式 GitHub Release 可通过 OIDC 自动发布到 VS Code 插件市场；首次使用前需要绑定发布者的可信发布策略。流程、绑定信息和手动预检入口见[自动发布说明](publishing.md)。
+正式 GitHub Release 会自动运行测试、构建并附加 VSIX 与 SHA-256 文件，无需配置 Marketplace 认证；插件市场上传仍由你手动完成。流程和手动预检入口见[Release 自动构建说明](publishing.md)。
 
 ## 参考
 

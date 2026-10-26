@@ -4,7 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 
 /** 加载实际发布脚本中的校验器，测试运行目录由 scripts/common.sh 固定。 */
-const { releaseMetadata, validateLock, publishAllowed, verifyChecksum } = require(path.resolve('scripts/release/metadata.cjs'));
+const { releaseMetadata, validateLock, verifyChecksum } = require(path.resolve('scripts/release/metadata.cjs'));
 /** 使用虚拟的未来版本验证构建脚本不再固定输出到旧版本。 */
 const manifest = { name: 'vscode-codex-speed', publisher: 'NO00', version: '1.2.3' };
 
@@ -21,11 +21,8 @@ test('版本不一致、缺少标签、异常版本或不同发布者必须阻�
   assert.throws(() => releaseMetadata({ ...manifest, publisher: 'other' }, {}), /NO00/);
 });
 
-test('手动预检可以构建当前版本，在线发布只允许正式 Release 事件', () => {
+test('手动预检可以构建当前版本，预发布版本被明确拒绝', () => {
   assert.equal(releaseMetadata(manifest, { GITHUB_EVENT_NAME: 'workflow_dispatch' }).version, '1.2.3');
-  assert.equal(publishAllowed({ GITHUB_EVENT_NAME: 'workflow_dispatch', RELEASE_IS_PRERELEASE: 'false' }), false);
-  assert.equal(publishAllowed({ GITHUB_EVENT_NAME: 'release', RELEASE_IS_PRERELEASE: 'true' }), false);
-  assert.equal(publishAllowed({ GITHUB_EVENT_NAME: 'release', RELEASE_IS_PRERELEASE: 'false' }), true);
   assert.throws(() => releaseMetadata(manifest, { RELEASE_IS_PRERELEASE: 'true' }), /预发布版本/);
 });
 
@@ -36,7 +33,7 @@ test('锁文件根版本或清单版本不匹配时拒绝继续', () => {
   assert.throws(() => validateLock(manifest, { ...lock, packages: { '': { version: '1.2.2' } } }), /根包版本/);
 });
 
-test('安装包内容、校验文件格式或文件名改变时不能在线发布', () => {
+test('安装包内容、校验文件格式或文件名改变时拒绝更新 Release 附件', () => {
   const content = Buffer.from('synthetic-vsix');
   const hash = crypto.createHash('sha256').update(content).digest('hex');
   const checksum = `${hash}  extension.vsix\n`;

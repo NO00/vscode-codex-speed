@@ -29,11 +29,6 @@ function validateLock(manifest, lock) {
   assert.equal(lock.packages?.['']?.version, manifest.version, '锁文件根包版本不一致');
 }
 
-/** 只有正式 release 事件可触发在线发布，手动运行永远只用于预检。 */
-function publishAllowed(environment = process.env) {
-  return environment.GITHUB_EVENT_NAME === 'release' && environment.RELEASE_IS_PRERELEASE === 'false';
-}
-
 /** 下载后先核对原有校验文件，避免在重新校验时覆盖并掩盖损坏的哈希。 */
 function verifyChecksum(content, checksum, basename) {
   const match = /^([a-f0-9]{64})[ \t]+\*?([^\r\n]+)\r?\n?$/i.exec(checksum);
@@ -63,7 +58,7 @@ function main() {
   }
 }
 
-module.exports = { releaseMetadata, validateLock, publishAllowed, verifyChecksum };
+module.exports = { releaseMetadata, validateLock, verifyChecksum };
 if (require.main === module) {
   try { main(); } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

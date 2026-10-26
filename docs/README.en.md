@@ -121,7 +121,7 @@ The package is generated at `artifacts/vscode-codex-speed-0.1.2.vsix`. Starting 
 
 Run `bash scripts/check-package.sh` to inspect an existing package, optionally passing a VSIX path. Checks reject duplicate paths after lossy ASCII conversion, non-ASCII paths, incorrect publisher/version metadata, and missing entry points or user documentation.
 
-Stable GitHub Releases can publish automatically through GitHub OIDC after a one-time trusted-publishing policy is configured for the Marketplace publisher. Manual workflow dispatch performs a build-only preflight. Configuration details and workflow behavior are documented in the Chinese [publishing guide](publishing.md).
+Stable GitHub Releases automatically run tests and attach a built VSIX with its SHA-256 file. No Marketplace authentication is configured; Marketplace uploads remain manual. Manual workflow dispatch performs a build-only preflight. Details are in the Chinese [Release build guide](publishing.md).
 
 ## References
 
