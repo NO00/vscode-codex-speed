@@ -19,7 +19,7 @@ Codex 85.0 tok/s · 上次   最近一次调用 / Last completed call
 - 直接在状态栏查看 Codex 的输出 token/s，悬停查看最近调用的模型、输出数量和耗时。
 - 在 Remote SSH 窗口读取服务器上的 Codex 日志，不用手动同步日志或再次配置 SSH 连接。
 - 汇总多个会话和子 agent，也可以只查看当前工作区中的会话。
-- 点击状态栏打开仪表盘：速度仪表、1／2／5 分钟曲线、会话列表及可切换范围的用量。
+- 点击状态栏打开仪表盘：数字读数、1／2／5 分钟曲线、会话列表及可切换范围的用量。
 
 这是独立的社区扩展，不属于 OpenAI 官方产品。界面默认跟随 VS Code 显示语言，支持英文、简体中文和繁体中文；其他语言使用英文。
 
@@ -31,7 +31,7 @@ Codex 85.0 tok/s · 上次   最近一次调用 / Last completed call
 
 首次使用会分批索引历史，显示进度及不完整提示。缓存保存计数与读取断点，重启后继续增量读取；只支持 `sessions` 目录下近 30 天内更新的未压缩 JSONL。缓存文件保存在扩展存储目录，Codex 日志保持只读。
 
-可直接在面板底部选择语言，顶部重新扫描或打开设置。关闭面板后仍按已有监控周期采样，未增加额外扫描计时器；没有费用或网络流量统计。
+监控台采用蓝色实测线和琥珀色估算线：宽屏为并排趋势区、横向用量数据和会话表格，窄窗口转为紧凑卡片，不使用圆形速度表。顶部可选择语言、重新扫描或打开设置，连接信息在下方按需展开。关闭面板后仍按已有监控周期采样，未增加额外扫描计时器；没有费用或网络流量统计。
 
 ### 安装后怎么用
 
@@ -91,7 +91,7 @@ Codex 85.0 tok/s · 上次   最近一次调用 / Last completed call
 - Codex output tokens per second in the status bar. Hover for the latest measured call's model, output count, and duration.
 - Direct log monitoring on your Remote SSH host, with no manual log synchronization or extra SSH connection setup.
 - Combined readings for multiple sessions and subagents, or a view limited to your workspace folders.
-- A dashboard with a speed gauge, 1/2/5-minute charts, session summaries and selectable usage periods.
+- A dashboard with a digital speed readout, 1/2/5-minute charts, session summaries and selectable usage periods.
 
 This is an independent community extension, not an official OpenAI product. The UI follows the VS Code display language by default. English, Simplified Chinese and Traditional Chinese are supported; other languages fall back to English.
 
@@ -101,7 +101,7 @@ Set `codexSpeed.language` to `auto` (default), `en`, `zh-cn` or `zh-tw` in User 
 
 Hover for a compact summary, or click the status item to open the full dashboard. Speed history accumulates while monitoring; solid segments are measured and dashed segments include estimates. Usage supports the last 30 minutes, today, the last 7 days and the last 30 days. Today is the default and uses the VS Code client’s time zone; 7/30-day periods use rolling hours. Input may include cached tokens; average speed uses completed calls with known duration. The peak can include estimates.
 
-Select a language at the bottom, rescan or open Settings from the toolbar. Closing the dashboard keeps the existing status-bar sampling active, without another scanning timer. Cost and network traffic tracking are not included.
+The console uses blue measured lines and amber estimate lines. Wide windows show the reading beside its trend, a horizontal usage strip and a session table; narrow windows use compact cards. Language, rescan and Settings are in the toolbar, with connection metadata in expandable details. Closing the dashboard keeps the existing status-bar sampling active, without another scanning timer. Cost and network traffic tracking are not included.
 
 ### Get started
 

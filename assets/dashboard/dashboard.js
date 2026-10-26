@@ -18,12 +18,6 @@
   function number(value, compact = false) {
     return new Intl.NumberFormat(latest.locale, { notation: compact ? 'compact' : 'standard', maximumFractionDigits: compact ? 1 : 0 }).format(value);
   }
-  /** 初始化仪表刻度，不随每秒数据更新重建。 */
-  for (let index = 0; index <= 36; index++) {
-    const angle = (135 + index * 7.5) * Math.PI / 180;
-    const radius = index % 6 === 0 ? 54 : 57;
-    document.getElementById('dial-ticks').append(svg('line', { x1: 90 + radius * Math.cos(angle), y1: 90 + radius * Math.sin(angle), x2: 90 + 60 * Math.cos(angle), y2: 90 + 60 * Math.sin(angle) }));
-  }
   /** 根据当前时间窗口绘图；断档留空，估算段使用虚线，绝不补造离线历史。 */
   function drawChart() {
     const { data, labels } = latest;
@@ -31,17 +25,33 @@
     const start = data.now - range * 1000;
     const points = data.points.filter(point => point.time >= start && point.time <= data.now);
     const max = Math.max(10, Math.ceil(Math.max(...points.map(point => point.rate), 0) / 25) * 25);
-    const left = 35, right = 594, top = 12, bottom = 150;
+    const width = Math.max(240, chart.getBoundingClientRect().width);
+    chart.setAttribute('viewBox', `0 0 ${width} 190`);
+    const left = 33, right = width - 7, top = 18, bottom = 161;
     const x = point => left + (point.time - start) / (range * 1000) * (right - left);
     const y = point => bottom - point.rate / max * (bottom - top);
     chart.replaceChildren();
     chart.setAttribute('aria-label', labels.chartLabel);
-    for (let index = 0; index <= 2; index++) {
-      const ordinate = top + index * (bottom - top) / 2;
-      chart.append(svg('line', { x1: left, y1: ordinate, x2: right, y2: ordinate, class: 'grid-line' }), svg('text', { x: 0, y: ordinate + 4 }, number(max * (1 - index / 2))));
+    const defs = svg('defs', {}), gradient = svg('linearGradient', { id: 'trend-fill', x1: 0, y1: 0, x2: 0, y2: 1 });
+    gradient.append(svg('stop', { offset: 0, 'stop-color': 'var(--accent)', 'stop-opacity': .2 }), svg('stop', { offset: 1, 'stop-color': 'var(--accent)', 'stop-opacity': 0 }));
+    defs.append(gradient); chart.append(defs);
+    for (let index = 0; index <= 3; index++) {
+      const ordinate = top + index * (bottom - top) / 3;
+      chart.append(svg('line', { x1: left, y1: ordinate, x2: right, y2: ordinate, class: 'grid-line' }), svg('text', { x: 0, y: ordinate + 3 }, number(max * (1 - index / 3))));
     }
     for (const fraction of [0, .5, 1]) {
-      chart.append(svg('text', { x: left + fraction * (right - left), y: 173, 'text-anchor': fraction === 0 ? 'start' : fraction === 1 ? 'end' : 'middle' }, fraction === 1 ? labels.now : `−${number(range * (1 - fraction))}s`));
+      chart.append(svg('text', { x: left + fraction * (right - left), y: 184, 'text-anchor': fraction === 0 ? 'start' : fraction === 1 ? 'end' : 'middle' }, fraction === 1 ? labels.now : `−${number(range * (1 - fraction))}s`));
+    }
+    // 面积底色只覆盖已观测的连续片段，不横跨离线断档。
+    const segments = [];
+    for (const point of points) {
+      const segment = segments.at(-1);
+      if (!segment || point.time - segment.at(-1).time > 15000) segments.push([point]);
+      else segment.push(point);
+    }
+    for (const segment of segments) if (segment.length > 1) {
+      const area = `M${x(segment[0])},${bottom} ` + segment.map(point => `L${x(point)},${y(point)}`).join(' ') + ` L${x(segment.at(-1))},${bottom} Z`;
+      chart.append(svg('path', { d: area, fill: 'url(#trend-fill)' }));
     }
     for (let index = 1; index < points.length; index++) {
       const previous = points[index - 1], point = points[index];
@@ -50,7 +60,7 @@
     }
     if (points.length) {
       const point = points[points.length - 1];
-      chart.append(svg('circle', { cx: x(point), cy: y(point), r: 3, fill: '#5edeb1' }));
+      chart.append(svg('circle', { cx: x(point), cy: y(point), r: 3, fill: point.kind === 'estimated' ? 'var(--estimate)' : 'var(--accent)' }));
     }
     document.getElementById('chart-empty').hidden = points.length >= 2;
     text('chart-empty', labels.collecting);
@@ -70,33 +80,42 @@
     if (!data.sessions.length) {
       const empty = document.createElement('p'); empty.className = 'empty'; empty.textContent = labels.noSessions; container.append(empty);
     }
-    for (const session of data.sessions) {
+    for (const [index, session] of data.sessions.entries()) {
       const row = document.createElement('div'); row.className = 'session';
-      const info = document.createElement('div');
+      const info = document.createElement('div'); info.className = 'session-identity';
+      const ordinal = document.createElement('span'); ordinal.className = 'session-index'; ordinal.textContent = String(index + 1).padStart(2, '0'); ordinal.setAttribute('aria-hidden', 'true');
+      const identity = document.createElement('div');
       const name = document.createElement('span'); name.className = 'session-name'; name.textContent = session.name || labels.unnamed; name.title = session.cwd || session.id;
-      const model = document.createElement('span'); model.className = 'session-model'; model.textContent = `Codex · ${session.model || labels.unknownModel}`;
-      const counts = document.createElement('div'); counts.className = 'session-counts'; counts.textContent = `${number(session.output, true)} ${labels.outputUnit} · ${number(session.responses)} ${labels.requestUnit}`;
-      info.append(name, model, counts);
-      const value = document.createElement('div');
+      const key = document.createElement('span'); key.className = 'session-key'; key.textContent = `# ${session.id.includes('/') || session.id.includes('\\') ? session.id.split(/[\\/]/).at(-1).slice(-12) : session.id.slice(0, 8)}`;
+      identity.append(name, key); info.append(ordinal, identity);
+      const model = document.createElement('span'); model.className = 'session-model'; model.textContent = session.model || labels.unknownModel; model.title = model.textContent;
+      const usage = document.createElement('div'); usage.className = 'session-usage';
+      const output = document.createElement('span'); output.className = 'session-output'; output.textContent = number(session.output, true); output.title = `${number(session.output)} ${labels.outputUnit}`; output.dataset.unit = labels.outputUnit;
+      const counts = document.createElement('span'); counts.className = 'session-counts'; counts.textContent = `${number(session.responses)} ${labels.requestUnit}`;
+      usage.append(output, document.createTextNode(' '), counts);
+      const value = document.createElement('div'); value.className = 'session-speed';
       const rate = document.createElement('div'); rate.className = 'session-rate'; rate.textContent = `${session.kind === 'estimated' ? '~' : ''}${session.rate.toFixed(1)} tok/s`;
       const phase = document.createElement('div'); phase.className = 'session-phase';
-      const dot = document.createElement('span'); dot.className = `dot ${session.phase}`;
       const label = document.createElement('span'); label.textContent = session.kind === 'last' ? labels.last : labels[session.phase];
-      phase.append(dot, label); value.append(rate, phase); row.append(info, value); container.append(row);
+      const meter = svg('svg', { viewBox: '0 0 100 3', class: `session-meter ${session.kind}`, 'aria-hidden': 'true' });
+      const fraction = Math.max(0, Math.min(1, session.rate / Math.max(100, data.usage.peak, data.snapshot.rate)));
+      meter.append(svg('rect', { x: 0, y: 0, width: 100, height: 3, class: 'track' }), svg('rect', { x: 0, y: 0, width: fraction * 100, height: 3, class: 'progress' }));
+      phase.append(label); value.append(rate, phase, meter); row.append(info, model, usage, value); container.append(row);
     }
     container.scrollTop = scroll;
   }
-  /** 更新卡片和实时仪表，沿用 VS Code 主题颜色及用户选择的语言。 */
+  /** 更新监控台，沿用 VS Code 主题颜色及用户选择的语言。 */
   function render(payload) {
     latest = payload;
     const { data, labels, context } = payload, snapshot = data.snapshot;
     document.documentElement.lang = payload.locale;
-    const mapping = { 'dashboard-title': 'dashboard', 'live-label': 'live', 'curve-title': 'curve', 'range-60': 'oneMinute', 'range-120': 'twoMinutes', 'range-300': 'fiveMinutes', 'measured-label': 'measured', 'estimated-label': 'estimated', 'curve-note': 'curveNote', 'source-title': 'source', 'source-note': 'sourceNote', 'sessions-title': 'sessions', 'usage-title': 'usage', 'output-label': 'output', 'input-label': 'input', 'responses-label': 'responses', 'average-label': 'average', 'peak-label': 'peak', 'usage-note': 'usageNote', 'host-label': 'host', 'directory-label': 'directory', 'scope-label': 'scope', 'language-label': 'language', 'language-auto': 'auto', 'estimate-note': 'estimateNote', 'last-note': 'lastNote', 'stale-note': 'stale', 'privacy-note': 'noCosts' };
+    const mapping = { 'dashboard-title': 'console', 'live-label': 'live', 'curve-title': 'curve', 'range-60': 'oneMinute', 'range-120': 'twoMinutes', 'range-300': 'fiveMinutes', 'measured-label': 'measured', 'estimated-label': 'estimated', 'curve-note': 'curveNote', 'source-note': 'sourceNote', 'sessions-title': 'sessions', 'usage-title': 'usage', 'output-label': 'output', 'input-label': 'input', 'responses-label': 'responses', 'average-label': 'average', 'peak-label': 'peak', 'usage-note': 'usageNote', 'host-label': 'host', 'directory-label': 'directory', 'scope-label': 'scope', 'language-label': 'language', 'language-auto': 'auto', 'estimate-note': 'estimateNote', 'last-note': 'lastNote', 'stale-note': 'stale', 'privacy-note': 'noCosts', 'connection-title': 'connection', 'session-name-heading': 'sessions', 'session-model-heading': 'model', 'session-output-heading': 'output', 'session-rate-heading': 'rate', 'timezone-label': 'timeZone' };
     for (const [id, key] of Object.entries(mapping)) text(id, labels[key]);
     for (const [value, key] of [['30m', 'last30m'], ['today', 'today'], ['7d', 'last7d'], ['30d', 'last30d']]) text(`usage-${value}`, labels[key]);
     const period = document.getElementById('usage-range');
     period.value = data.usage.range; period.setAttribute('aria-label', labels.usageRange);
     text('history-note', labels.historyNote);
+    text('timezone-value', data.usage.timeZone);
     text('usage-timezone', `${labels.timeZone}: ${data.usage.timeZone}`);
     text('stale-note', `${labels.stale} ${labels.sessionPeriod}`);
     const history = data.history;
@@ -105,21 +124,17 @@
     text('history-status', warnings.join(' ')); document.getElementById('history-status').hidden = !warnings.length;
     for (const id of ['refresh', 'settings']) { document.getElementById(id).title = labels[id]; document.getElementById(id).setAttribute('aria-label', labels[id]); }
     const phase = context.error ? 'error' : snapshot.kind;
+    document.body.dataset.state = !context.enabled ? 'disabled' : phase;
     text('rate', context.error || !context.enabled ? '—' : `${snapshot.kind === 'estimated' ? '~' : ''}${snapshot.rate.toFixed(1)}`);
+    document.getElementById('rate').dataset.digits = document.getElementById('rate').textContent.length > 6 ? 'long' : 'normal';
     text('phase', !context.enabled ? labels.disabled : labels[phase]);
     document.getElementById('phase-dot').className = `dot ${phase === 'tools' ? 'tools' : ['idle', 'last', 'error'].includes(phase) ? 'idle' : ''}`;
     text('activity', `${labels.generating} ${number(snapshot.active)} · ${labels.tools} ${number(data.sessions.filter(session => session.phase === 'tools').length)}`);
-    const scale = Math.max(100, data.usage.peak);
-    const displayRate = context.error || !context.enabled ? 0 : snapshot.rate;
-    const progress = Math.max(0, Math.min(1, displayRate / scale));
-    document.getElementById('dial-progress').setAttribute('stroke-dasharray', `${progress * 311} 415`);
-    document.getElementById('needle').setAttribute('transform', `rotate(${-135 + progress * 270} 90 90)`);
     const notice = [!context.enabled ? labels.disabled : context.notice, context.limited ? labels.partial : ''].filter(Boolean).join(' ');
     text('notice', notice); document.getElementById('notice').hidden = !notice; document.getElementById('notice').classList.toggle('error', context.error);
-    text('source-output', `${number(data.usage.output, true)} ${labels.outputUnit}`);
     for (const key of ['output', 'input', 'responses']) { text(`${key}-value`, number(data.usage[key], true)); document.getElementById(`${key}-value`).title = number(data.usage[key]); }
     text('average-value', `${data.usage.average.toFixed(1)} tok/s`); text('peak-value', `${data.usage.peak.toFixed(1)} tok/s`);
-    text('host-value', context.host); text('directory-value', context.home); text('scope-value', context.scope === 'all' ? labels.all : labels.workspace);
+    text('connection-host', context.host); text('host-value', context.host); text('directory-value', context.home); text('scope-value', context.scope === 'all' ? labels.all : labels.workspace);
     text('updated', `${labels.updated} ${new Date(data.now).toLocaleTimeString(payload.locale, { hour12: false })}`);
     document.getElementById('last-note').hidden = snapshot.kind !== 'last';
     document.getElementById('language').value = payload.selectedLanguage;
@@ -134,5 +149,6 @@
   document.getElementById('language').addEventListener('change', event => api.postMessage({ type: 'language', value: event.target.value }));
   document.getElementById('usage-range').addEventListener('change', event => api.postMessage({ type: 'usageRange', value: event.target.value }));
   window.addEventListener('message', event => { if (event.data?.type === 'update') render(event.data.payload); });
+  new ResizeObserver(() => { if (latest) drawChart(); }).observe(document.getElementById('chart'));
   api.postMessage({ type: 'ready', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
 })();

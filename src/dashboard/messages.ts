@@ -3,6 +3,7 @@ import { Translate } from '../localization';
 /** 向脚本传递已选择语言的界面词条；浏览器端不读取操作系统语言。 */
 export function dashboardMessages(t: Translate): Record<string, string> {
   return {
+    console: t('Monitoring console'), connection: t('Connection details'), rate: t('Rate'),
     dashboard: t('Dashboard'), live: t('Live output'), generating: t('Generating'), tools: t('Tools'), idle: t('Idle'),
     measured: t('Measured'), estimated: t('Estimated'), last: t('Last'), waiting: t('Waiting for counts'),
     curve: t('Output speed'), oneMinute: t('1 min'), twoMinutes: t('2 min'), fiveMinutes: t('5 min'),
