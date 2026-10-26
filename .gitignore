@@ -10,3 +10,5 @@ artifacts/
 *.log
 .DS_Store
 Thumbs.db
+output/
+.playwright-cli/

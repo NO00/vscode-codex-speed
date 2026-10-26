@@ -4,9 +4,12 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { FileLogger } from './logger';
 import { CodexMonitor, errorCode, MonitorState } from './monitor';
-import { measured, sampleRate } from './engine';
+import { calculate, measured } from './engine';
 import { MonitorOptions } from './types';
 import { createTranslator, resolveLanguage, Translate } from './localization';
+import { DashboardHistory } from './dashboard/model';
+import { dashboardMessages } from './dashboard/messages';
+import { DashboardPanel, DashboardPayload } from './dashboard/panel';
 
 /** 使用客户端显示语言；Remote SSH 宿主不读取服务器系统语言。 */
 let translate: Translate = vscode.l10n.t;
@@ -56,18 +59,18 @@ export function statusText(state: MonitorState): string {
 export function tooltip(state: MonitorState, options: MonitorOptions, host: string): vscode.MarkdownString {
   const tip = new vscode.MarkdownString();
   tip.appendMarkdown('### VSCode Codex Speed\n\n');
-  tip.appendText(t('Host: {0}\nDirectory: {1}\nScope: {2}\n', host, options.home, options.scope === 'all' ? t('All recent sessions on this host') : t('Current workspace')));
   const s = state.snapshot;
   const source = {
     measured: t('Measured over a three-second window'), estimated: t('Includes estimates from previous rates (~)'),
     last: t('Last completed call, not the current rate'), waiting: t('Generating, waiting for token counts'),
     tools: t('Waiting for tool results'), idle: t('Idle')
   }[s.kind];
-  tip.appendText(t('\nOutput speed: {0} token/s\nSource: {1}\nSessions: {2}, generating: {3}\nLast 30 minutes: {4} output tokens / {5} responses\n', s.rate.toFixed(1), source, s.sessions, s.active, s.output.toLocaleString(uiLanguage), s.responses));
-  if (s.latest && measured(s.latest)) tip.appendText(t('\nLatest model: {0}\nLatest call: {1} tok/s, {2} output tokens, {3} seconds\n', s.latest.model, sampleRate(s.latest).toFixed(1), s.latest.output, ((s.latest.end - s.latest.start) / 1000).toFixed(2)));
+  tip.appendText(t('Output speed: {0} tok/s\n{1}\nSessions: {2} · generating: {3}\n', `${s.kind === 'estimated' ? '~' : ''}${s.rate.toFixed(1)}`, source, s.sessions, s.active));
+  if (s.latest && measured(s.latest)) tip.appendText(t('Model: {0}\n', s.latest.model === '未知模型' ? t('Unknown model') : s.latest.model));
+  tip.appendText(t('Host: {0}\n', host));
   if (state.notice) tip.appendText(`\n${state.notice}\n`);
-  if (state.limited) tip.appendText(t('\nScan limit reached. Only some sessions are shown.\n'));
-  tip.appendText(t('\nOutput includes reasoning; duration includes time to first token. Values marked ~ during generation are estimates; logs do not provide live per-token counts.\nClick for details and actions.'));
+  if (state.limited) tip.appendText(t('Scan limit reached. Only some sessions are shown.'));
+  tip.appendText(t('\nClick to open the dashboard.'));
   return tip;
 }
 
@@ -84,6 +87,20 @@ export function activate(context: vscode.ExtensionContext): void {
   const host = `${vscode.env.remoteName ?? 'local'} / ${os.hostname()}`;
   let state: MonitorState | undefined;
   let options = readOptions();
+  let history = new DashboardHistory();
+  /** 从现有只读监控器创建面板快照，隐藏时不会被调用。 */
+  function dashboardPayload(): DashboardPayload {
+    const snapshot = state?.snapshot ?? calculate([], options, Date.now());
+    return { data: history.data(monitor ? [...monitor.tailers.values()].map(item => item.parser) : [], options, snapshot, Date.now()),
+      labels: dashboardMessages(t), locale: uiLanguage,
+      selectedLanguage: vscode.workspace.getConfiguration('codexSpeed').get<string>('language', 'auto'),
+      context: { host, home: options.home, scope: options.scope, notice: state?.notice ?? '', error: state?.error ?? false,
+        limited: state?.limited ?? false, enabled: vscode.workspace.getConfiguration('codexSpeed').get<boolean>('enabled', true) } };
+  }
+  const dashboard = new DashboardPanel(context.extensionUri, dashboardPayload, {
+    refresh: () => { void render(true); }, settings: () => { void vscode.commands.executeCommand('codexSpeed.openSettings'); },
+    language: value => { void vscode.workspace.getConfiguration('codexSpeed').update('language', value, vscode.ConfigurationTarget.Global); }
+  });
 
   /** 自动模式使用 VS Code 原生翻译；手动模式仅在设置变化时读取内置资源。 */
   function configureLanguage(): void {
@@ -95,19 +112,24 @@ export function activate(context: vscode.ExtensionContext): void {
   /** 刷新失败时仍保持状态栏可诊断；配置更换后丢弃旧实例结果。 */
   async function render(force = false): Promise<void> {
     const current = monitor;
-    if (!current || disposed) return;
+    if (!current || disposed) { if (!disposed) dashboard.update(); return; }
     try {
       const result = await current.tick(force);
       if (monitor !== current || disposed) return;
       state = result;
+      history.record(result.snapshot, Date.now(), result.error);
       bar.text = statusText(result);
       bar.tooltip = tooltip(result, options, host);
       bar.backgroundColor = result.error ? new vscode.ThemeColor('statusBarItem.warningBackground') : undefined;
       bar.accessibilityInformation = { label: bar.text.replace(/\$\([^)]+\)/g, '') };
+      dashboard.update();
     } catch (error) {
       logger.write(t('Refresh failed: {0}', errorCode(error)));
       bar.text = `$(warning) Codex ${t('Read error')}`;
       bar.tooltip = t('Click to view diagnostic logs or check the Codex Home setting.');
+      state = { snapshot: state?.snapshot ?? calculate([], options, Date.now()), notice: t('Refresh failed: {0}', errorCode(error)), error: true, limited: false };
+      history.record(state.snapshot, Date.now(), true);
+      dashboard.update();
     }
   }
 
@@ -118,7 +140,8 @@ export function activate(context: vscode.ExtensionContext): void {
     monitor = undefined;
     state = undefined;
     options = readOptions();
-    if (!vscode.workspace.getConfiguration('codexSpeed').get<boolean>('enabled', true)) { bar.hide(); return; }
+    history = new DashboardHistory();
+    if (!vscode.workspace.getConfiguration('codexSpeed').get<boolean>('enabled', true)) { bar.hide(); dashboard.update(); return; }
     monitor = new CodexMonitor(options, message => logger.write(message), Date.now, t);
     logger.write(t('Monitoring started: {0}; Codex Home={1}; scope={2}', host, options.home, options.scope));
     bar.text = `$(sync~spin) Codex ${t('Scanning')}`;
@@ -128,25 +151,16 @@ export function activate(context: vscode.ExtensionContext): void {
     timer = setInterval(() => { void render(); }, options.pollIntervalMs);
   }
 
-  context.subscriptions.push(output, bar,
+  context.subscriptions.push(output, bar, dashboard,
     // 只返回计数及运行状态，供诊断和真实扩展宿主回放使用。
-    vscode.commands.registerCommand('codexSpeed.getDiagnostics', () => ({ state, text: bar.text, home: options.home, remote: vscode.env.remoteName ?? 'local' })),
-    vscode.commands.registerCommand('codexSpeed.showLogs', () => output.show()),
+    vscode.commands.registerCommand('codexSpeed.getDiagnostics', () => ({ state, text: bar.text, home: options.home, remote: vscode.env.remoteName ?? 'local', dashboardVisible: dashboard.visible, dashboardRender: dashboard.lastRender })),
+    vscode.commands.registerCommand('codexSpeed.showLogs', () => { output.appendLine(t('Diagnostic log file: {0}', logger.file)); output.show(); }),
     vscode.commands.registerCommand('codexSpeed.openSettings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:NO00.vscode-codex-speed')),
     vscode.commands.registerCommand('codexSpeed.refresh', () => render(true)),
+    vscode.commands.registerCommand('codexSpeed.openDashboard', () => { dashboard.show(); }),
     vscode.commands.registerCommand('codexSpeed.showDetails', async () => {
-      const choice = await vscode.window.showQuickPick([
-        { label: `$(output) ${t('Show speed details')}`, description: state ? t('{0} tok/s · {1} sessions', state.snapshot.rate.toFixed(1), state.snapshot.sessions) : t('Waiting for scan'), action: 'details' },
-        { label: `$(refresh) ${t('Rescan logs')}`, action: 'refresh' },
-        { label: `$(settings-gear) ${t('Configure log directory and scope')}`, action: 'settings' }
-      ], { title: `VSCode Codex Speed · ${host}` });
-      if (choice?.action === 'refresh') await render(true);
-      if (choice?.action === 'settings') await vscode.commands.executeCommand('codexSpeed.openSettings');
-      if (choice?.action === 'details') {
-        if (state) output.appendLine(tooltip(state, options, host).value);
-        output.appendLine(t('Diagnostic log file: {0}', logger.file));
-        output.show();
-      }
+      // 保留既有命令标识供老快捷键使用，状态栏点击直接打开完整仪表盘。
+      dashboard.show();
     }),
     vscode.workspace.onDidChangeConfiguration(event => {
       if (!event.affectsConfiguration('codexSpeed')) return;

@@ -1,5 +1,6 @@
 {
-  "config.language": "狀態列、懸浮詳細資料、操作選單和診斷提示的語言，切換後立即生效。命令選擇區標題和設定說明跟隨 VS Code 顯示語言。",
+  "command.openDashboard": "Codex Speed: 開啟儀表板",
+  "config.language": "狀態列、懸浮摘要、儀表板和診斷提示的語言，切換後立即生效。命令選擇區標題和設定說明跟隨 VS Code 顯示語言。",
   "config.language.auto": "跟隨 VS Code 顯示語言；未支援的語言使用英文。",
   "extension.description": "在 VS Code 狀態列查看 Codex 輸出 token/s，支援 Remote SSH。",
   "command.showDetails": "Codex Speed: 查看測速詳細資料",

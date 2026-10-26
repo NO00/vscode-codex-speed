@@ -8,6 +8,8 @@ dist/tests/**
 scripts/**
 logs/**
 artifacts/**
+output/**
+.playwright-cli/**
 package-lock.json
 tsconfig.json
 .gitignore

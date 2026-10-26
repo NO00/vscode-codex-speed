@@ -1,5 +1,6 @@
 {
-  "config.language": "Language for the status bar, hover details, action menu and diagnostic messages. Applies immediately. Command Palette titles and Settings descriptions follow the VS Code display language.",
+  "command.openDashboard": "Codex Speed: Open Dashboard",
+  "config.language": "Language for the status bar, hover summary, dashboard and diagnostic messages. Applies immediately. Command Palette titles and Settings descriptions follow the VS Code display language.",
   "config.language.auto": "Follow the VS Code display language (use English for unsupported languages).",
   "extension.description": "Monitor Codex output token/s in the VS Code status bar, including Remote SSH.",
   "command.showDetails": "Codex Speed: Show Speed Details",

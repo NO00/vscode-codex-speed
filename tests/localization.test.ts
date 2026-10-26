@@ -7,7 +7,7 @@ import { createTranslator, formatMessage, resolveLanguage } from '../src/localiz
 /** 提取实际运行时代码的翻译调用，避免只验证翻译文件自己的一致性。 */
 function runtimeMessages(): Set<string> {
   const messages = new Set<string>();
-  for (const file of ['src/extension.ts', 'src/monitor.ts']) {
+  for (const file of ['src/extension.ts', 'src/monitor.ts', 'src/dashboard/messages.ts']) {
     const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.ES2022, true);
     /** 递归寻找 t(...) 与 this.t(...)；翻译消息必须为可静态提取的字面量。 */
     function visit(node: ts.Node): void {

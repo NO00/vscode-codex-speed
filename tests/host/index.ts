@@ -14,6 +14,9 @@ interface Diagnostics {
   text: string;
   /** 运行主机解析后的 Codex Home。 */
   home: string;
+  /** 实际 Webview 可见状态及前端回传的渲染确认。 */
+  dashboardVisible: boolean;
+  dashboardRender?: { locale: string; sessions: number };
 }
 
 /** 等待异步状态栏刷新，在限定时间内失败而不是永久阻塞。 */
@@ -61,8 +64,11 @@ export async function run(): Promise<void> {
     const tip = tooltip(measured.state!, { home, scanDays: 3, scope: 'all', workspaces: [], showEstimates: true, pollIntervalMs: 500 }, 'ssh-remote / test-host').value.replace(/&nbsp;/g, ' ');
     assert.ok(tip.includes(chinese ? '宿主' : 'Host'));
     assert.ok(tip.includes(chinese ? traditional ? '輸出速度' : '输出速度' : 'Output speed'));
-    assert.ok(tip.includes(chinese ? '估算' : 'estimates'));
+    assert.ok(tip.includes(chinese ? traditional ? '儀表板' : '仪表盘' : 'dashboard'));
+    assert.ok(tip.length < 650, '悬浮摘要不应重新堆成长面板');
     assert.ok(!tip.includes(chinese ? 'Output speed' : '输出速度'));
+    await vscode.commands.executeCommand('codexSpeed.showDetails');
+    await waitFor(d => d.dashboardVisible && d.dashboardRender?.sessions === 1);
     now = Date.now();
     await fs.appendFile(file, row(now, 'event_msg', { type: 'task_started' }) + '\n');
     const estimated = await waitFor(d => d.state?.snapshot.kind === 'estimated');
@@ -75,7 +81,9 @@ export async function run(): Promise<void> {
       await vscode.workspace.getConfiguration('codexSpeed').update('language', selected, vscode.ConfigurationTarget.Global);
       const changed = await waitFor(d => d.text.includes(expected!));
       assert.equal(changed.state?.snapshot.output, 300);
-      assert.equal(extension.packageJSON.contributes.commands[0].title, commandTitle, '手动语言不改变 VS Code 原生清单标题');
+      const declared: string | { value: string; original: string } = extension.packageJSON.contributes.commands.find((item: { command: string }) => item.command === 'codexSpeed.showDetails').title;
+      assert.equal(declared, commandTitle, '手动语言不改变 VS Code 原生清单标题');
+      await waitFor(d => d.dashboardRender?.locale === (selected === 'auto' ? locale : selected));
     }
     now = Date.now();
     await fs.appendFile(file, row(now, 'token_usage_record', { response_id: 'two', usage: { output_tokens: 120 } }) + '\n' + row(now + 1, 'event_msg', { type: 'task_complete' }) + '\n');
@@ -92,7 +100,18 @@ export async function run(): Promise<void> {
     await vscode.workspace.getConfiguration('codexSpeed').update('language', 'auto', vscode.ConfigurationTarget.Global);
     await vscode.workspace.getConfiguration('codexSpeed').update('codexHome', home, vscode.ConfigurationTarget.Global);
     await waitFor(d => d.state?.snapshot.output === 420 && !d.state.error);
-    await fs.writeFile(report, JSON.stringify({ ok: true, locale: vscode.env.language, checks: ['真实宿主加载', 'workspace 远程部署声明', '日志发现与状态栏文字', '实测/估算/等待切换', '配置变更重启', '增量输出去重', '路径错误与恢复', '客户端语言及原生翻译加载', '悬浮提示及错误提示翻译', '手动切换四种语言选项并保留用量', '错误提示随手动语言切换'] }));
+    await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+    await waitFor(d => !d.dashboardVisible);
+    await vscode.commands.executeCommand('codexSpeed.openDashboard');
+    await waitFor(d => d.dashboardVisible && d.dashboardRender?.sessions === 1 && d.state?.snapshot.output === 420);
+    await vscode.workspace.getConfiguration('codexSpeed').update('enabled', false, vscode.ConfigurationTarget.Global);
+    await waitFor(d => d.dashboardRender?.sessions === 0);
+    await vscode.workspace.getConfiguration('codexSpeed').update('language', 'zh-tw', vscode.ConfigurationTarget.Global);
+    await waitFor(d => d.dashboardRender?.locale === 'zh-tw');
+    await vscode.workspace.getConfiguration('codexSpeed').update('language', 'auto', vscode.ConfigurationTarget.Global);
+    await vscode.workspace.getConfiguration('codexSpeed').update('enabled', true, vscode.ConfigurationTarget.Global);
+    await waitFor(d => d.state?.snapshot.output === 420 && d.dashboardRender?.locale === locale);
+    await fs.writeFile(report, JSON.stringify({ ok: true, locale: vscode.env.language, checks: ['真实宿主加载', 'workspace 远程部署声明', '日志发现与状态栏文字', '实测/估算/等待切换', '配置变更重启', '增量输出去重', '路径错误与恢复', '客户端语言及原生翻译加载', '悬浮摘要及错误提示翻译', '手动切换四种语言选项并保留用量', '错误提示随手动语言切换', 'Webview 实际脚本渲染与语言更新', '关闭并重开仪表盘', '停用监控后仍可切换面板语言'] }));
   } catch (error) {
     await fs.writeFile(report, JSON.stringify({ ok: false, error: error instanceof Error ? error.stack : String(error) }));
     throw error;

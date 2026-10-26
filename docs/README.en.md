@@ -10,20 +10,28 @@ The extension runs as a `workspace` extension. In a remote window, it reads Code
 
 > This is an independent extension, not an official OpenAI extension or part of Agent Speed.
 
+## Dashboard (0.1.4)
+
+Hover over the status item for a compact summary. Click it, or run **Codex Speed: Open Dashboard**, to open the dashboard beside your editor. It includes a speed gauge, measured/estimated state, 1/2/5-minute charts, session/model/phase summaries, and usage statistics from available records in the last 30 minutes. The toolbar provides rescan and Settings actions; the language selector applies immediately.
+
+The chart records while monitoring and retains five minutes in memory. Dashed segments include estimates; retained last-call values are not recorded as live speed. No history is invented for time before monitoring began. Changing log directories, scope, or restarting monitoring resets the chart; switching language does not. Closing the dashboard leaves status-bar sampling active, while hidden dashboards skip detailed aggregation.
+
+Input counts may include cached tokens. Average speed is weighted by completed request duration and excludes responses with unknown duration. The five-minute peak can include estimates. This release does not provide daily totals, long-term history, cost estimates or network traffic monitoring.
+
 ## Interface language
 
 Since 0.1.3, the UI follows the VS Code client display language. English, Simplified Chinese and Traditional Chinese are supported; other languages fall back to English. Remote SSH uses the client's display language, not the server's system locale.
 
-Set `codexSpeed.language` to `auto` (default), `en`, `zh-cn` or `zh-tw` in User or Remote settings, for example `"codexSpeed.language": "en"`. Manual changes immediately update the status bar, hover details, action menu and diagnostic messages without reloading or resetting usage counts.
+Set `codexSpeed.language` to `auto` (default), `en`, `zh-cn` or `zh-tw` in User or Remote settings, for example `"codexSpeed.language": "en"`. Manual changes immediately update the status bar, hover details, dashboard and diagnostic messages without reloading or resetting usage counts.
 
 Command Palette titles and Settings descriptions always follow the VS Code display language. Restart VS Code when prompted after changing its display language.
 
 ## Install in a Remote SSH window
 
 1. Connect to your server using **Remote - SSH** and open a remote folder.
-2. Open the Command Palette and run **Extensions: Install from VSIX...**. Select `vscode-codex-speed-0.1.3.vsix`.
+2. Open the Command Palette and run **Extensions: Install from VSIX...**. Select `vscode-codex-speed-0.1.4.vsix`.
 3. Confirm that **VSCode Codex Speed** appears under **SSH: your-server — Installed** in the Extensions view. If it is installed only locally, select **Install in SSH: your-server**. Run **Developer: Reload Window** if needed.
-4. Run Codex on the server as the same user. The status bar will show `Codex … tok/s`. New sessions are normally discovered within about five seconds, and existing logs are polled every second by default. Click the item to refresh, view details, or open settings.
+4. Run Codex on the server as the same user. The status bar will show `Codex … tok/s`. New sessions are normally discovered within about five seconds, and existing logs are polled every second by default. Click the item to open the dashboard, whose toolbar offers rescanning and Settings.
 
 The extension host must have permission to read the Codex user's data directory. If Codex runs as a different user, inside a container, or with a custom `CODEX_HOME`, install the extension in the matching environment or configure an accessible directory.
 
@@ -92,7 +100,7 @@ The Command Palette provides these commands:
 - **Codex Speed: Open Settings** — Open settings.
 - **Codex Speed: Show Diagnostic Logs** — Show diagnostic logs.
 
-Diagnostic logs record operational messages, paths, and operating-system error codes. They are written to `logs/codex-speed.log` under VS Code's extension log directory and rotate after approximately 1 MiB. Click the status item and choose speed details to see the file location.
+Diagnostic logs record operational messages, paths, and operating-system error codes. They are written to `logs/codex-speed.log` under VS Code's extension log directory and rotate after approximately 1 MiB. Run **Codex Speed: Show Diagnostic Logs** to see the file location.
 
 ## Limits, performance, and privacy
 
@@ -126,7 +134,7 @@ If no executable path is supplied, `@vscode/test-electron` downloads a separate 
 
 For a Windows installation using version subdirectories, an updater lock may prevent a new instance from starting. Use `bash scripts/host-test.sh --copy-installed "/path/to/VS Code"` to create an isolated copy under `.vscode-test/isolated-installed`. Only that copy's product metadata is adjusted to disable Windows installer update coordination; the original installation remains read-only. This tests the installed version, not necessarily the minimum supported version.
 
-The package is generated at `artifacts/vscode-codex-speed-0.1.3.vsix`. Starting with 0.1.2, `docs/MARKETPLACE.md` supplies the bilingual user-facing Marketplace overview, and `assets/icon.png` supplies the extension's own icon. Version 0.1.3 includes manifest and runtime translations. The detailed Chinese/English README files remain in the repository. No Node.js dependency installation is required on the server. All VSIX paths use ASCII characters for upload compatibility. Architecture and validation documents remain in the source repository at `docs/设计说明.md` and `docs/验证记录.md`.
+The package is generated at `artifacts/vscode-codex-speed-0.1.4.vsix`. Starting with 0.1.2, `docs/MARKETPLACE.md` supplies the bilingual user-facing Marketplace overview, and `assets/icon.png` supplies the extension's own icon. Version 0.1.3 includes manifest and runtime translations. The detailed Chinese/English README files remain in the repository. No Node.js dependency installation is required on the server. All VSIX paths use ASCII characters for upload compatibility. Architecture and validation documents remain in the source repository at `docs/设计说明.md` and `docs/验证记录.md`.
 
 Run `bash scripts/check-package.sh` to inspect an existing package, optionally passing a VSIX path. Checks reject duplicate paths after lossy ASCII conversion, non-ASCII paths, incorrect publisher/version metadata, and missing entry points or user documentation.
 

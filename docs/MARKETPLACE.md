@@ -19,11 +19,17 @@ Codex 85.0 tok/s · 上次   最近一次调用 / Last completed call
 - 直接在状态栏查看 Codex 的输出 token/s，悬停查看最近调用的模型、输出数量和耗时。
 - 在 Remote SSH 窗口读取服务器上的 Codex 日志，不用手动同步日志或再次配置 SSH 连接。
 - 汇总多个会话和子 agent，也可以只查看当前工作区中的会话。
-- 点击状态栏即可查看详情、重新扫描或调整设置。
+- 点击状态栏打开仪表盘：速度仪表、1／2／5 分钟曲线、会话列表及近半小时用量。
 
 这是独立的社区扩展，不属于 OpenAI 官方产品。界面默认跟随 VS Code 显示语言，支持英文、简体中文和繁体中文；其他语言使用英文。
 
-设置 `codexSpeed.language` 可选 `auto`（默认）、`en`、`zh-cn` 或 `zh-tw`。手动切换立即更新状态栏、悬浮提示、操作菜单及诊断提示，无需重载。Remote SSH 跟随客户端语言，手动选择请写入远程设置。命令面板标题和设置说明始终跟随 VS Code 显示语言。
+设置 `codexSpeed.language` 可选 `auto`（默认）、`en`、`zh-cn` 或 `zh-tw`。手动切换立即更新状态栏、悬浮提示、仪表盘及诊断提示，无需重载。Remote SSH 跟随客户端语言，手动选择请写入远程设置。命令面板标题和设置说明始终跟随 VS Code 显示语言。
+
+### 仪表盘
+
+悬停显示简洁摘要，点击状态栏打开完整仪表盘。曲线从本次监控启动后开始积累，实线为实测，虚线包含估算。用量仅统计近 30 分钟已读取的日志，不是全天数据；输入可能含缓存 token，平均速度使用耗时已知的已完成调用。峰值可能包含估算。
+
+可直接在面板底部选择语言，顶部重新扫描或打开设置。关闭面板后仍按已有监控周期采样，未增加额外扫描计时器；没有费用或网络流量统计。
 
 ### 安装后怎么用
 
@@ -82,11 +88,17 @@ Codex 85.0 tok/s · 上次   最近一次调用 / Last completed call
 - Codex output tokens per second in the status bar. Hover for the latest measured call's model, output count, and duration.
 - Direct log monitoring on your Remote SSH host, with no manual log synchronization or extra SSH connection setup.
 - Combined readings for multiple sessions and subagents, or a view limited to your workspace folders.
-- One-click access to details, rescanning, and settings.
+- A dashboard with a speed gauge, 1/2/5-minute charts, session summaries and usage from the last 30 minutes.
 
 This is an independent community extension, not an official OpenAI product. The UI follows the VS Code display language by default. English, Simplified Chinese and Traditional Chinese are supported; other languages fall back to English.
 
-Set `codexSpeed.language` to `auto` (default), `en`, `zh-cn` or `zh-tw` in User or Remote settings. Manual changes immediately update the status bar, hover details, action menu and diagnostic messages without reloading. Remote SSH follows the client's display language, not the server's system locale. Command Palette titles and Settings descriptions always follow VS Code's display language.
+Set `codexSpeed.language` to `auto` (default), `en`, `zh-cn` or `zh-tw` in User or Remote settings. Manual changes immediately update the status bar, hover details, dashboard and diagnostic messages without reloading. Remote SSH follows the client's display language, not the server's system locale. Command Palette titles and Settings descriptions always follow VS Code's display language.
+
+### Dashboard
+
+Hover for a compact summary, or click the status item to open the full dashboard. Speed history accumulates while monitoring; solid segments are measured and dashed segments include estimates. Usage covers available log records in the last 30 minutes, not daily totals. Input may include cached tokens; average speed uses completed calls with known duration. The peak can include estimates.
+
+Select a language at the bottom, rescan or open Settings from the toolbar. Closing the dashboard keeps the existing status-bar sampling active, without another scanning timer. Cost and network traffic tracking are not included.
 
 ### Get started
 
