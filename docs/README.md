@@ -1,5 +1,7 @@
 # VSCode Codex Speed
 
+简体中文 | [English](https://github.com/NO00/vscode-codex-speed/blob/main/docs/README.en.md)
+
 在 VS Code 状态栏查看 **Remote SSH 服务器上的 Codex 输出 token/s**。也支持本机 VS Code、WSL 和开发容器。扩展声明为 `workspace` 类型，在远程窗口中直接运行于远程扩展宿主，读取该用户的 Codex 日志；不需要额外填写 SSH 密码或同步日志。
 
 ## 安装到 Remote SSH
@@ -96,7 +98,7 @@ Windows 真实宿主测试示例：
 
 若本机为使用版本子目录的 Windows 安装，且更新锁阻止启动，可使用 `bash scripts/host-test.sh --copy-installed "/path/to/VS Code"`。脚本把当前版本复制到 `.vscode-test/isolated-installed`，仅在副本的产品元数据中关闭 Windows 安装器更新协调，原安装保持只读。这适合验证当前已安装版本，不代表最低版本验证。
 
-产物位于 `artifacts/vscode-codex-speed-0.1.0.vsix`。VSIX 包含已编译代码和中文文档，不需要在服务器安装 Node.js 依赖。架构与测速细节见源码中的 `docs/设计说明.md`。
+产物位于 `artifacts/vscode-codex-speed-0.1.0.vsix`。VSIX 包含已编译代码和中英文使用说明，不需要在服务器安装 Node.js 依赖。架构与测速细节见源码中的 `docs/设计说明.md`。
 
 ## 参考
 

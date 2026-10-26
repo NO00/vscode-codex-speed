@@ -1,0 +1,124 @@
+# VSCode Codex Speed
+
+English | [简体中文](https://github.com/NO00/vscode-codex-speed/blob/main/docs/README.md)
+
+Monitor **Codex output tokens per second on a Remote SSH server** from the VS Code status bar. Local VS Code, WSL, and development containers are also supported by the extension's workspace-host architecture.
+
+The extension runs as a `workspace` extension. In a remote window, it reads Codex logs directly on the remote extension host, using that host's user account. No additional SSH credentials or log synchronization are needed.
+
+> This is an independent extension, not an official OpenAI extension or part of Agent Speed. The current extension UI is in Simplified Chinese; this document explains its labels in English.
+
+## Install in a Remote SSH window
+
+1. Connect to your server using **Remote - SSH** and open a remote folder.
+2. Open the Command Palette and run **Extensions: Install from VSIX...**. Select `vscode-codex-speed-0.1.0.vsix`.
+3. Confirm that **VSCode Codex Speed** appears under **SSH: your-server — Installed** in the Extensions view. If it is installed only locally, select **Install in SSH: your-server**. Run **Developer: Reload Window** if needed.
+4. Run Codex on the server as the same user. The status bar will show `Codex … tok/s`. New sessions are normally discovered within about five seconds, and existing logs are polled every second by default. Click the item to refresh, view details, or open settings.
+
+The extension host must have permission to read the Codex user's data directory. If Codex runs as a different user, inside a container, or with a custom `CODEX_HOME`, install the extension in the matching environment or configure an accessible directory.
+
+If you previously installed **Codex SSH Speed**, uninstall that older extension before installing this package. The extension ID has changed, and running both versions can cause duplicate status items and command registrations. Existing `codexSpeed.*` settings remain compatible.
+
+## Configure the log directory
+
+The default data directory is taken from the extension host's `CODEX_HOME` environment variable, falling back to `~/.codex`. VS Code Server may inherit a different environment from your interactive terminal; set the path explicitly if necessary.
+
+In your Remote SSH window, add this to **Remote Settings (JSON)**:
+
+```json
+{
+  "codexSpeed.codexHome": "/home/your-user/.codex",
+  "codexSpeed.scope": "all",
+  "codexSpeed.pollIntervalMs": 1000,
+  "codexSpeed.showEstimates": true
+}
+```
+
+Set `codexHome` to the data directory containing `sessions`, not to `.../.codex/sessions` itself. Paths starting with `~/` are supported.
+
+The default `all` scope aggregates recent sessions on the host, including terminal sessions and subagents. Use `workspace` to include only sessions whose logged `cwd` is inside one of the current workspace folders. This selects folders, not the particular chat currently visible in the Codex UI.
+
+All settings use VS Code's machine scope. Set them in User or Remote settings rather than in a project's `.vscode/settings.json`.
+
+## Understand the status bar
+
+The examples below preserve the Chinese labels shown by the current UI.
+
+| Display | Meaning |
+| --- | --- |
+| `Codex 85.0 tok/s` | Output rate derived from completed response records within the trailing three-second window |
+| `Codex ~85.0 tok/s` | Generation is in progress; the rate includes an estimate based on this session's latest three measured responses |
+| `Codex -- tok/s · 等待计数` | Waiting for usage counts: generation is in progress, but no speed reference is available or estimates are disabled |
+| `Codex 85.0 tok/s · 上次` | Last completed call's average speed, retained for up to 15 seconds; this is not the current live rate |
+| `Codex 0.0 tok/s · 工具中` | The model has finished a response and is waiting for tool results |
+| `Codex 0.0 tok/s` | Idle |
+| `Codex -- tok/s` | No matching sessions; hover for the configured path and diagnostic information |
+| `Codex 日志` with a warning icon | Missing directory, insufficient permissions, or another log-reading error; hover for details |
+
+When multiple sessions are generating, the item includes `· N agents`. The suffix `· 部分` means a scan limit was reached and the displayed data is partial.
+
+**The logs do not provide token-by-token live counts.** Here, “live” means continuous monitoring and display updates. During generation, `~` marks an estimate based on previous measured speeds. Completed usage records replace that estimate with a rate derived from token counts and log timestamps. An estimated value is not a count of tokens actually produced in the current second. Disable `showEstimates` to wait for measured results instead.
+
+Output uses `output_tokens`, which already includes reasoning tokens. `reasoning_output_tokens` must not be added again. Request duration is inferred from input and usage-record timestamps, includes time to first token, and excludes the preceding wait for tool results. Network delays and retries can affect the result. This is a different metric from the model server's internal decoding speed.
+
+If an end event is missing, a session can retain its generation estimate until five minutes after its latest log event. Also, the host-wide scope can show activity from another Codex session even when the chat you are looking at has stopped.
+
+## Settings and commands
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `codexSpeed.enabled` | `true` | Enable monitoring |
+| `codexSpeed.codexHome` | Empty | Automatically resolve the Codex data directory |
+| `codexSpeed.scope` | `all` | Monitor `all` recent host sessions or only the current `workspace` |
+| `codexSpeed.pollIntervalMs` | `1000` | Incremental reads and display refresh interval, from 500 to 10000 ms |
+| `codexSpeed.scanDays` | `3` | Include recently modified logs from the last 1–30 days; resumed sessions in older date folders can also be discovered |
+| `codexSpeed.showEstimates` | `true` | Show generation estimates marked with `~` |
+
+The Command Palette provides these commands:
+
+- **Codex Speed: 查看测速详情** — Show speed details.
+- **Codex Speed: 重新扫描日志** — Rescan logs.
+- **Codex Speed: 打开设置** — Open settings.
+- **Codex Speed: 查看诊断日志** — Show diagnostic logs.
+
+Diagnostic logs record operational messages, paths, and operating-system error codes. They are written to `logs/codex-speed.log` under VS Code's extension log directory and rotate after approximately 1 MiB. Click the status item and choose speed details to see the file location.
+
+## Limits, performance, and privacy
+
+- Supports modern `token_usage_record` and legacy `event_msg/token_count` events. Modern records take precedence to avoid double-counting compatibility events.
+- Reads uncompressed `.jsonl` files under `sessions`. This version does not read `.jsonl.zst` files or archived sessions, and does not provide historical reports.
+- Rediscovers files every five seconds. Each discovery pass visits at most 20000 file/directory entries, traverses up to six levels, and tracks the latest 128 session files. Workspace filtering uses the logged `cwd`.
+- For large files, startup reads identity metadata from the beginning and parses only the last 8 MiB. Subsequent polling reads at most 4 MiB per file per pass. Partial JSON lines are buffered until complete; lines larger than 2 MiB are skipped. Usage records without a known request start can contribute token counts but do not produce an invented duration.
+- Retains up to 1000 responses per session from the last 30 minutes and rebuilds state from logs after a restart. Parallel sessions are aggregated and completed responses are deduplicated by identity. Generation estimates stop after five minutes without a new log event.
+- Makes no network requests, reads no login credentials, and does not modify Codex configuration or session files. It does not persist or output conversation text. Parsing necessarily touches raw JSONL rows, but the retained data consists of timestamps, counts, model names, session identities, and working directories.
+
+## Develop, test, and package
+
+Requires Node.js 20+ and Bash. On Windows, Git Bash can be used. Dependency installation, builds, and tests run through scripts in `scripts/`; their output is also saved under `logs/`.
+
+```bash
+bash scripts/setup.sh
+bash scripts/test.sh
+bash scripts/host-test.sh "/path/to/VS Code/executable"
+bash scripts/package.sh
+```
+
+Windows example:
+
+```powershell
+& 'C:\Program Files\Git\bin\bash.exe' scripts/host-test.sh 'C:\path\to\Microsoft VS Code\Code.exe'
+```
+
+`host-test.sh` launches VS Code with separate temporary user data, synthetic Codex logs, and an isolated extensions directory. It does not change your existing VS Code configuration. Reports and host logs are retained in the temporary directory printed by the script.
+
+If no executable path is supplied, `@vscode/test-electron` downloads a separate VS Code 1.90.2 test copy from Microsoft and runs the host tests against that version. A successful download and test run are required to confirm compatibility with that minimum version. The completed host validation for this project used VS Code 1.143.1; minimum-version and actual Remote SSH validation remain outstanding.
+
+For a Windows installation using version subdirectories, an updater lock may prevent a new instance from starting. Use `bash scripts/host-test.sh --copy-installed "/path/to/VS Code"` to create an isolated copy under `.vscode-test/isolated-installed`. Only that copy's product metadata is adjusted to disable Windows installer update coordination; the original installation remains read-only. This tests the installed version, not necessarily the minimum supported version.
+
+The package is generated at `artifacts/vscode-codex-speed-0.1.0.vsix`. It includes compiled code and Chinese/English documentation; no Node.js dependency installation is required on the server. Architecture and validation notes are available in the Chinese documents `docs/设计说明.md` and `docs/验证记录.md`.
+
+## References
+
+- [VS Code: Supporting Remote Development](https://code.visualstudio.com/api/advanced-topics/remote-extensions)
+- [Codex repository](https://github.com/openai/codex)
+- [Agent Speed measurement specification](https://github.com/zoefix/agent-speed/blob/main/spec/METRICS.md)
