@@ -142,7 +142,7 @@ The package is generated at `artifacts/vscode-codex-speed-0.1.5.vsix`. Starting 
 
 Run `bash scripts/check-package.sh` to inspect an existing package, optionally passing a VSIX path. Checks reject duplicate paths after lossy ASCII conversion, non-ASCII paths, incorrect publisher/version metadata, and missing entry points or user documentation.
 
-Stable GitHub Releases automatically run tests and attach a built VSIX with its SHA-256 file. No Marketplace authentication is configured; Marketplace uploads remain manual. Manual workflow dispatch performs a build-only preflight. Details are in the Chinese [Release build guide](publishing.md).
+Pushing a matching stable `vX.Y.Z` tag automatically runs tests, builds the VSIX and creates a GitHub Release with the VSIX and SHA-256 attachments. The release stays a draft until upload and verification succeed. No additional token is required. Manual workflow dispatch remains build-only. Marketplace uploads remain manual. Details are in the Chinese [release guide](publishing.md).
 
 ## References
 

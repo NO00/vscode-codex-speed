@@ -1,34 +1,35 @@
 name: 构建 Release 安装包
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# 正式 Release 与手动预检使用独立队列。
+# 同一标签串行处理；不同版本和手动预检互不取消。
 concurrency:
-  group: release-package-${{ github.event_name }}
+  group: release-package-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   build:
     name: 测试、打包并保存产物
-    if: github.event_name != 'release' || github.event.release.prerelease == false
+    if: github.event_name != 'push' || github.event.deleted == false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: write
     env:
-      RELEASE_TAG: ${{ github.event.release.tag_name }}
-      RELEASE_IS_PRERELEASE: ${{ github.event.release.prerelease }}
+      RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || '' }}
+      RELEASE_DELETED: ${{ github.event.deleted }}
     steps:
       - name: 检出发布标签或手动预检分支
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.event.release.tag_name || github.ref }}
+          ref: ${{ github.ref }}
           persist-credentials: false
       - name: 设置 Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -53,8 +54,8 @@ jobs:
             ${{ steps.metadata.outputs.checksum_path }}
           if-no-files-found: error
           retention-days: 14
-      - name: 更新 GitHub Release 附件
-        if: github.event_name == 'release'
+      - name: 创建 Release 并上传附件
+        if: github.event_name == 'push' && github.ref_type == 'tag'
         run: bash scripts/release/upload.sh
         env:
           GH_TOKEN: ${{ github.token }}

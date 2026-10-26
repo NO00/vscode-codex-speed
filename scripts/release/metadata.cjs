@@ -8,10 +8,10 @@ function releaseMetadata(manifest, environment = process.env) {
   assert.equal(manifest.publisher, 'NO00', 'Publisher 必须为 NO00');
   assert.match(manifest.version, /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/, '正式发布必须使用稳定的三段版本号');
   const tag = environment.RELEASE_TAG || '';
-  if (environment.GITHUB_EVENT_NAME === 'release' || tag) {
+  if (environment.GITHUB_EVENT_NAME === 'push' || tag) {
     assert.equal(tag, `v${manifest.version}`, 'Release 标签必须与 package.json 完全一致，例如 v0.1.3');
   }
-  assert.notEqual(environment.RELEASE_IS_PRERELEASE, 'true', '此工作流仅发布正式版本，预发布版本会跳过');
+  if (environment.GITHUB_EVENT_NAME === 'push') validateTagRef(manifest, environment);
   const basename = `${manifest.name}-${manifest.version}.vsix`;
   return {
     version: manifest.version,
@@ -20,6 +20,20 @@ function releaseMetadata(manifest, environment = process.env) {
     checksum_path: `artifacts/${basename}.sha256`,
     artifact_name: `${manifest.name}-${manifest.version}`
   };
+}
+
+/** 写入 Release 只允许明确的稳定版本标签推送，手动预检即使选择标签也不能发布。 */
+function validateTagPush(manifest, environment = process.env) {
+  assert.equal(environment.GITHUB_EVENT_NAME, 'push', '仅标签 push 事件允许创建 Release');
+  validateTagRef(manifest, environment);
+}
+
+/** 标签名称、完整 ref 和删除标识都须一致，分支推送或预发布标签不能绕过校验。 */
+function validateTagRef(manifest, environment) {
+  assert.equal(environment.GITHUB_REF_TYPE, 'tag', '仅标签推送允许发布');
+  assert.equal(environment.GITHUB_REF, `refs/tags/v${manifest.version}`, '标签 ref 必须与版本一致');
+  assert.equal(environment.RELEASE_TAG, `v${manifest.version}`, 'Release 标签必须与版本完全一致');
+  assert.notEqual(environment.RELEASE_DELETED, 'true', '删除标签不能发布 Release');
 }
 
 /** 安装依赖前也能检查锁文件与清单，避免打包到另一个版本。 */
@@ -43,7 +57,10 @@ function main() {
   const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
   validateLock(manifest, lock);
   const metadata = releaseMetadata(manifest);
-  if (process.argv[2] === '--verify-checksum') {
+  if (process.argv[2] === '--assert-tag-push') {
+    validateTagPush(manifest);
+    console.log('标签推送发布上下文校验通过');
+  } else if (process.argv[2] === '--verify-checksum') {
     verifyChecksum(fs.readFileSync(metadata.vsix_path), fs.readFileSync(metadata.checksum_path, 'utf8'), metadata.basename);
     console.log('下载的 VSIX 与原 SHA-256 校验文件一致');
   } else if (process.argv[2] === '--field') {
@@ -58,7 +75,7 @@ function main() {
   }
 }
 
-module.exports = { releaseMetadata, validateLock, verifyChecksum };
+module.exports = { releaseMetadata, validateLock, verifyChecksum, validateTagPush };
 if (require.main === module) {
   try { main(); } catch (error) { console.error(error.message); process.exitCode = 1; }
 }
