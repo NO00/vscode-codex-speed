@@ -83,6 +83,9 @@ export async function run(): Promise<void> {
     await waitFor(d => d.dashboardRender?.usageRange === '30m' && d.dashboardRender.output === 300);
     await vscode.workspace.getConfiguration('codexSpeed').update('usageRange', 'today', vscode.ConfigurationTarget.Global);
     await fs.unlink(oldFile);
+    // 真实宿主确认调用离开窗口后，状态栏不会继续保留上次速度。
+    const quiet = await waitFor(d => d.state?.snapshot.output === 300 && d.state.snapshot.kind === 'idle' && d.state.snapshot.rate === 0);
+    assert.match(quiet.text, /Codex 0\.0 tok\/s/);
     now = Date.now();
     await fs.appendFile(file, row(now, 'event_msg', { type: 'task_started' }) + '\n');
     const estimated = await waitFor(d => d.state?.snapshot.kind === 'estimated');
@@ -125,7 +128,7 @@ export async function run(): Promise<void> {
     await vscode.workspace.getConfiguration('codexSpeed').update('language', 'auto', vscode.ConfigurationTarget.Global);
     await vscode.workspace.getConfiguration('codexSpeed').update('enabled', true, vscode.ConfigurationTarget.Global);
     await waitFor(d => d.state?.snapshot.output === 420 && d.dashboardRender?.locale === locale);
-    await fs.writeFile(report, JSON.stringify({ ok: true, locale: vscode.env.language, checks: ['真实宿主加载', 'workspace 远程部署声明', '日志发现与状态栏文字', '实测/估算/等待切换', '配置变更重启', '增量输出去重', '路径错误与恢复', '客户端语言及原生翻译加载', '悬浮摘要及错误提示翻译', '手动切换四种语言选项并保留用量', '错误提示随手动语言切换', 'Webview 实际脚本渲染与语言更新', '关闭并重开仪表盘', '停用监控后仍可切换面板语言', '默认今天和四种用量时间范围', '历史记录只在对应范围内累计'] }));
+    await fs.writeFile(report, JSON.stringify({ ok: true, locale: vscode.env.language, checks: ['真实宿主加载', 'workspace 远程部署声明', '日志发现与状态栏文字', '无窗口内输出时状态栏归零', '实测/估算/等待切换', '配置变更重启', '增量输出去重', '路径错误与恢复', '客户端语言及原生翻译加载', '悬浮摘要及错误提示翻译', '手动切换四种语言选项并保留用量', '错误提示随手动语言切换', 'Webview 实际脚本渲染与语言更新', '关闭并重开仪表盘', '停用监控后仍可切换面板语言', '默认今天和四种用量时间范围', '历史记录只在对应范围内累计'] }));
   } catch (error) {
     await fs.writeFile(report, JSON.stringify({ ok: false, error: error instanceof Error ? error.stack : String(error) }));
     throw error;

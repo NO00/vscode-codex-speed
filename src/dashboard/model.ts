@@ -7,7 +7,7 @@ import { HistoryStatus, UsageRange, UsageSummary } from '../history/types';
 export interface SpeedPoint {
   /** 扩展宿主采样时刻。 */
   time: number;
-  /** 当前输出速度；空闲、等待及上次调用时为零。 */
+  /** 当前输出速度；空闲、等待及工具阶段没有窗口内输出时为零。 */
   rate: number;
   /** 数字的来源。 */
   kind: Snapshot['kind'];
@@ -27,7 +27,7 @@ export interface SessionSummary {
   phase: Session['phase'];
   /** 会话速度及其来源。 */
   rate: number;
-  /** 估算或上次结果需要明确标识。 */
+  /** 估算结果需要明确标识，不回填历史调用速度。 */
   kind: Snapshot['kind'];
   /** 最近半小时去重后的输出量。 */
   output: number;

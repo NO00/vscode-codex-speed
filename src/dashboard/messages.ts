@@ -18,7 +18,7 @@ export function dashboardMessages(t: Translate): Record<string, string> {
     disabled: t('Monitoring is disabled. Enable it in Settings.'), error: t('Check log access'), source: t('Source'),
     outputUnit: t('output tokens'), requestUnit: t('responses'), sourceNote: t('Read-only Codex logs'),
     noCosts: t('No cost or network traffic tracking'), chartLabel: t('Output speed over time'), totalSessions: t('tracked'),
-    lastNote: t('Last completed call; the live curve is zero while idle.'),
+    lastNote: t('Last completed call'),
     stale: t('Session activity expires after five minutes without new events.'),
     indexing: t('Indexing history'), indexedFiles: t('files processed'), incomplete: t('Totals may be incomplete.'),
     historyPartial: t('Some history could not be read or a resource limit was reached.'),

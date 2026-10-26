@@ -37,11 +37,11 @@ test('仪表盘遵守工作区和半小时边界，失联会话回到空闲', ()
   assert.equal(model.data([first], filtered, data.snapshot, 3000000).usage.output, 0);
 });
 
-test('曲线不将上次速度当实时值，错误归零并限制为五分钟', () => {
+test('空闲及错误时曲线归零并限制为五分钟', () => {
   const model = new DashboardHistory();
   const snapshot = { ...calculate([], options, 0), rate: 80, kind: 'measured' as const };
   for (let index = 0; index <= 1000; index++) model.record(snapshot, index * 500);
-  model.record({ ...snapshot, kind: 'last' }, 500500);
+  model.record({ ...snapshot, rate: 0, kind: 'idle' }, 500500);
   model.record(snapshot, 501000, true);
   const data = model.data([], options, snapshot, 501000);
   assert.ok(data.points.length <= 601);
@@ -56,6 +56,21 @@ test('重复刷新覆盖曲线最后一点，时钟回退后重建时间线', ()
   assert.equal(model.data([], options, snapshot, 1000100).points.length, 1);
   model.record(snapshot, 999999);
   assert.deepEqual(model.data([], options, snapshot, 999999).points.map(point => point.time), [999999]);
+});
+
+test('工具阶段主读数、会话读数与曲线末点均为零，不回填上次调用', () => {
+  const first = session('a');
+  response(first, 1000000, 1001000, 133);
+  first.phase = 'tools'; first.lastEvent = 1001000;
+  const now = 1005000, model = new DashboardHistory();
+  const snapshot = calculate([first], options, now);
+  model.record(snapshot, now);
+  const data = model.data([first], options, snapshot, now);
+  assert.equal(data.points.at(-1)!.rate, 0);
+  assert.equal(data.snapshot.rate, data.points.at(-1)!.rate);
+  assert.equal(data.snapshot.kind, 'tools');
+  assert.equal(data.sessions[0]!.rate, 0);
+  assert.equal(data.snapshot.latest?.output, 133);
 });
 
 test('Webview 禁止默认资源、外部网络和未授权脚本，HTML 不嵌入会话数据', () => {

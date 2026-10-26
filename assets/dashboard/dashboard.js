@@ -96,7 +96,7 @@
       const value = document.createElement('div'); value.className = 'session-speed';
       const rate = document.createElement('div'); rate.className = 'session-rate'; rate.textContent = `${session.kind === 'estimated' ? '~' : ''}${session.rate.toFixed(1)} tok/s`;
       const phase = document.createElement('div'); phase.className = 'session-phase';
-      const label = document.createElement('span'); label.textContent = session.kind === 'last' ? labels.last : labels[session.phase];
+      const label = document.createElement('span'); label.textContent = labels[session.phase];
       const meter = svg('svg', { viewBox: '0 0 100 3', class: `session-meter ${session.kind}`, 'aria-hidden': 'true' });
       const fraction = Math.max(0, Math.min(1, session.rate / Math.max(100, data.usage.peak, data.snapshot.rate)));
       meter.append(svg('rect', { x: 0, y: 0, width: 100, height: 3, class: 'track' }), svg('rect', { x: 0, y: 0, width: fraction * 100, height: 3, class: 'progress' }));
@@ -128,7 +128,7 @@
     text('rate', context.error || !context.enabled ? '—' : `${snapshot.kind === 'estimated' ? '~' : ''}${snapshot.rate.toFixed(1)}`);
     document.getElementById('rate').dataset.digits = document.getElementById('rate').textContent.length > 6 ? 'long' : 'normal';
     text('phase', !context.enabled ? labels.disabled : labels[phase]);
-    document.getElementById('phase-dot').className = `dot ${phase === 'tools' ? 'tools' : ['idle', 'last', 'error'].includes(phase) ? 'idle' : ''}`;
+    document.getElementById('phase-dot').className = `dot ${phase === 'tools' ? 'tools' : ['idle', 'error'].includes(phase) ? 'idle' : ''}`;
     text('activity', `${labels.generating} ${number(snapshot.active)} · ${labels.tools} ${number(data.sessions.filter(session => session.phase === 'tools').length)}`);
     const notice = [!context.enabled ? labels.disabled : context.notice, context.limited ? labels.partial : ''].filter(Boolean).join(' ');
     text('notice', notice); document.getElementById('notice').hidden = !notice; document.getElementById('notice').classList.toggle('error', context.error);
@@ -136,7 +136,11 @@
     text('average-value', `${data.usage.average.toFixed(1)} tok/s`); text('peak-value', `${data.usage.peak.toFixed(1)} tok/s`);
     text('connection-host', context.host); text('host-value', context.host); text('directory-value', context.home); text('scope-value', context.scope === 'all' ? labels.all : labels.workspace);
     text('updated', `${labels.updated} ${new Date(data.now).toLocaleTimeString(payload.locale, { hour12: false })}`);
-    document.getElementById('last-note').hidden = snapshot.kind !== 'last';
+    // 上次调用独立展示并附时间，不参与当前读数或曲线；缺失耗时不得编造速度。
+    const last = snapshot.latest;
+    const hasLast = last && last.start !== undefined && last.end > last.start && last.end <= data.now;
+    text('last-note', hasLast ? `${labels.lastNote}: ${(last.output * 1000 / (last.end - last.start)).toFixed(1)} tok/s · ${new Date(last.end).toLocaleTimeString(payload.locale, { hour12: false })}` : '');
+    document.getElementById('last-note').hidden = !hasLast || !context.enabled || context.error;
     document.getElementById('language').value = payload.selectedLanguage;
     drawChart(); drawSessions();
     // 只用于宿主确认脚本收到并绘制了真实数据，不回传路径、模型或会话内容。

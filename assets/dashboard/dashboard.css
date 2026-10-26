@@ -7,13 +7,13 @@
   --border: var(--vscode-widget-border, #2a3444);
   --panel: var(--vscode-editorWidget-background, #161e2b);
   --accent: var(--vscode-charts-blue, #8baaff);
-  --estimate: var(--vscode-charts-orange, #edbc79);
+  --estimate: #80dec9;
   --soft: color-mix(in srgb, var(--accent) 8%, transparent);
   --mono: "Cascadia Code", "SFMono-Regular", Consolas, "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", monospace;
 }
 * { box-sizing: border-box; }
 body { margin: 0; color: var(--fg); background: var(--bg); font: 13px/1.6 var(--vscode-font-family, "Segoe UI", "Microsoft YaHei", sans-serif); }
-body.vscode-light { color-scheme: light; }
+body.vscode-light { color-scheme: light; --estimate: #087f75; }
 h2, p { margin: 0; }
 h2 { font-size: 14px; font-weight: 600; letter-spacing: .2px; }
 button, select { color: var(--fg); background: var(--panel); border: 1px solid var(--border); font: inherit; cursor: pointer; }
@@ -132,7 +132,6 @@ body[data-state="estimated"] #phase-dot { background: var(--estimate); }
 .session-meter .track { fill: var(--border); }
 .session-meter .progress { fill: var(--accent); }
 .session-meter.estimated .progress { fill: var(--estimate); }
-.session-meter.last .progress { fill: var(--muted); }
 #stale-note { padding: 10px 18px 12px; border-top: 1px solid var(--border); font-size: 10px; }
 .sessions .empty { padding: 25px 18px; color: var(--muted); font-size: 12px; }
 

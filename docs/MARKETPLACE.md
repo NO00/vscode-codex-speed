@@ -9,7 +9,7 @@
 ```text
 Codex 85.0 tok/s          输出速度 / Measured rate
 Codex ~85.0 tok/s         生成中估算 / Generation estimate
-Codex 85.0 tok/s · 上次   最近一次调用 / Last completed call
+Codex 0.0 tok/s          无当前输出 / No current output
 ```
 
 ## 简体中文
@@ -31,7 +31,7 @@ Codex 85.0 tok/s · 上次   最近一次调用 / Last completed call
 
 首次使用会分批索引历史，显示进度及不完整提示。缓存保存计数与读取断点，重启后继续增量读取；只支持 `sessions` 目录下近 30 天内更新的未压缩 JSONL。缓存文件保存在扩展存储目录，Codex 日志保持只读。
 
-监控台采用蓝色实测线和琥珀色估算线：宽屏为并排趋势区、横向用量数据和会话表格，窄窗口转为紧凑卡片，不使用圆形速度表。顶部可选择语言、重新扫描或打开设置，连接信息在下方按需展开。关闭面板后仍按已有监控周期采样，未增加额外扫描计时器；没有费用或网络流量统计。
+监控台采用蓝色实测线和浅蓝绿色估算线：宽屏为并排趋势区、横向用量数据和会话表格，窄窗口转为紧凑卡片，不使用圆形速度表。顶部可选择语言、重新扫描或打开设置，连接信息在下方按需展开。关闭面板后仍按已有监控周期采样，未增加额外扫描计时器；没有费用或网络流量统计。
 
 ### 安装后怎么用
 
@@ -56,7 +56,7 @@ Codex 85.0 tok/s · 上次   最近一次调用 / Last completed call
 | `85.0 tok/s` | 已完成响应的日志计数在最近三秒窗口内折算的速度 |
 | `~85.0 tok/s` | 生成中，依据该会话近期调用速度估算 |
 | `等待计数` | 尚无可靠速度参考，或已关闭估算 |
-| `上次` | 最近完成的一次调用速度，最多保留约 15 秒 |
+| `0.0 tok/s` | 三秒窗口已无输出；上次调用速度与时间在仪表盘单独展示 |
 | `工具中` / `0.0 tok/s` | 等待工具结果，或当前空闲 |
 
 **生成中的 `~` 是估算，不是逐 token 的实时计数。** Codex 写入完成记录后，插件再用实际 token 数和日志时间更新。速度包含首 token 等待时间，输出计数包含 reasoning，不能直接与模型服务器的纯解码速度比较。
@@ -101,7 +101,7 @@ Set `codexSpeed.language` to `auto` (default), `en`, `zh-cn` or `zh-tw` in User 
 
 Hover for a compact summary, or click the status item to open the full dashboard. Speed history accumulates while monitoring; solid segments are measured and dashed segments include estimates. Usage supports the last 30 minutes, today, the last 7 days and the last 30 days. Today is the default and uses the VS Code client’s time zone; 7/30-day periods use rolling hours. Input may include cached tokens; average speed uses completed calls with known duration. The peak can include estimates.
 
-The console uses blue measured lines and amber estimate lines. Wide windows show the reading beside its trend, a horizontal usage strip and a session table; narrow windows use compact cards. Language, rescan and Settings are in the toolbar, with connection metadata in expandable details. Closing the dashboard keeps the existing status-bar sampling active, without another scanning timer. Cost and network traffic tracking are not included.
+The console uses blue measured lines and teal estimate lines. Wide windows show the reading beside its trend, a horizontal usage strip and a session table; narrow windows use compact cards. Language, rescan and Settings are in the toolbar, with connection metadata in expandable details. Closing the dashboard keeps the existing status-bar sampling active, without another scanning timer. Cost and network traffic tracking are not included.
 
 ### Get started
 
@@ -120,7 +120,7 @@ For a custom data directory, set `codexSpeed.codexHome` in VS Code **User or Rem
 | `85.0 tok/s` | Rate derived from completed response records over the trailing three-second window |
 | `~85.0 tok/s` | Generation estimate based on this session's recent measured calls |
 | `Waiting for counts` | Waiting for usage counts; no reference is available or estimates are disabled |
-| `Last` | Last completed call's rate, retained for up to about 15 seconds |
+| `0.0 tok/s` | No current output in the three-second window; last-call rate and time appear separately in the dashboard |
 | `Tools` / `0.0 tok/s` | Waiting for tool results, or idle |
 
 **A rate marked with `~` is an estimate, not token-by-token telemetry.** Completed Codex records update it using actual counts and log timestamps. Duration includes time to first token; output includes reasoning. This differs from a model server's internal decoding rate.

@@ -58,7 +58,7 @@ export interface Snapshot {
   /** 采用三秒滑动窗口汇总的输出 token/s。 */
   rate: number;
   /** 状态栏数字的来源或等待状态。 */
-  kind: 'measured' | 'estimated' | 'last' | 'waiting' | 'tools' | 'idle';
+  kind: 'measured' | 'estimated' | 'waiting' | 'tools' | 'idle';
   /** 有效的正在生成会话数。 */
   active: number;
   /** 范围内已跟踪的会话数。 */

@@ -43,11 +43,14 @@ test('首次生成或关闭估算时显示等待，五分钟不更新后不能�
   assert.equal(calculate([a], { ...options, showEstimates: false }, 1410000).kind, 'waiting');
 });
 
-test('完成后的最近速率明确标为上次，15 秒后归零，不长时间伪装实时', () => {
+test('完成调用离开三秒窗口后当前速度立即归零，历史速度仅保留在 latest', () => {
   const a = session();
   response(a, 1000000, 1001000, 90);
   a.consume(row(1001001, 'event_msg', { type: 'task_complete' }));
-  assert.equal(calculate([a], options, 1006000).kind, 'last');
+  const stopped = calculate([a], options, 1006000);
+  assert.equal(stopped.rate, 0);
+  assert.equal(stopped.kind, 'idle');
+  assert.equal(stopped.latest?.output, 90);
   assert.equal(calculate([a], options, 1020000).rate, 0);
   assert.equal(calculate([a], options, 1020000).kind, 'idle');
 });

@@ -42,7 +42,7 @@ function readOptions(): MonitorOptions {
   };
 }
 
-/** 将计算结果映射为状态栏文字，明确区分实测、估算、等待和上次速度。 */
+/** 将当前计算结果映射为状态栏文字，历史调用不回填实时速度。 */
 export function statusText(state: MonitorState): string {
   if (state.error) return `$(warning) Codex ${t('Logs')}`;
   const s = state.snapshot;
@@ -52,7 +52,6 @@ export function statusText(state: MonitorState): string {
   const limit = state.limited ? ` · ${t('Partial')}` : '';
   if (s.kind === 'estimated') return `$(pulse) Codex ~${number} tok/s${suffix}${limit}`;
   if (s.kind === 'waiting') return `$(pulse) Codex -- tok/s · ${t('Waiting for counts')}${suffix}${limit}`;
-  if (s.kind === 'last') return `$(pulse) Codex ${number} tok/s · ${t('Last')}${limit}`;
   if (s.kind === 'tools') return `$(tools) Codex 0.0 tok/s · ${t('Tools')}${limit}`;
   return `$(pulse) Codex ${number} tok/s${suffix}${limit}`;
 }
@@ -64,7 +63,7 @@ export function tooltip(state: MonitorState, options: MonitorOptions, host: stri
   const s = state.snapshot;
   const source = {
     measured: t('Measured over a three-second window'), estimated: t('Includes estimates from previous rates (~)'),
-    last: t('Last completed call, not the current rate'), waiting: t('Generating, waiting for token counts'),
+    waiting: t('Generating, waiting for token counts'),
     tools: t('Waiting for tool results'), idle: t('Idle')
   }[s.kind];
   tip.appendText(t('Output speed: {0} tok/s\n{1}\nSessions: {2} · generating: {3}\n', `${s.kind === 'estimated' ? '~' : ''}${s.rate.toFixed(1)}`, source, s.sessions, s.active));

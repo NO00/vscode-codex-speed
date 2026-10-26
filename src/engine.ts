@@ -66,8 +66,7 @@ export function calculate(sessions: Session[], options: Pick<MonitorOptions, 'sc
     }
   }
   let kind: Snapshot['kind'] = estimated ? 'estimated' : rate > 0 ? 'measured' : active.length > 0 ? 'waiting' : 'idle';
-  // 不让上次速度冒充当前速度；短暂保留时必须明确显示“上次”。
-  if (kind === 'idle' && latest && latest.end >= now - 15000) { kind = 'last'; rate = sampleRate(latest); }
+  // 历史调用只通过 latest 展示，绝不回填当前速率；主读数与实时曲线共用同一三秒窗口。
   if (kind === 'idle' && selected.some(s => s.phase === 'tools' && s.lastEvent >= now - 300000)) kind = 'tools';
   return { rate, kind, active: new Set(active.map(s => s.id)).size, sessions: selected.length, responses: samples.length, output: samples.reduce((sum, s) => sum + s.output, 0), latest };
 }
