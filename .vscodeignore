@@ -14,3 +14,6 @@ tsconfig.json
 .vscodeignore
 docs/设计说明.md
 docs/验证记录.md
+docs/README.md
+docs/README.en.md
+docs/design/**

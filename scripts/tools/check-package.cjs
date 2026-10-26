@@ -5,7 +5,7 @@ const yauzl = require('yauzl');
 
 /** 验证实际 VSIX 的部署声明、入口和文件清单，避免把测试与依赖打进包。 */
 async function main() {
-  const file = process.argv[2] || 'artifacts/vscode-codex-speed-0.1.1.vsix';
+  const file = process.argv[2] || 'artifacts/vscode-codex-speed-0.1.2.vsix';
   const entries = new Map();
   await new Promise((resolve, reject) => {
     yauzl.open(file, { lazyEntries: true }, (error, zip) => {
@@ -41,13 +41,20 @@ async function main() {
   assert.deepEqual(manifest.extensionKind, ['workspace']);
   assert.ok(entries.has(`extension/${manifest.main.replace(/^\.\//, '')}`));
   assert.ok(entries.has('extension/readme.md'));
-  assert.ok(entries.has('extension/docs/README.en.md'));
+  const readme = entries.get('extension/readme.md').toString('utf8');
+  assert.ok(readme.includes('## 简体中文') && readme.includes('## English'), '市场首页必须同时包含中英文用户说明');
+  assert.equal(manifest.icon, 'assets/icon.png', '必须配置独立的插件图标');
+  const icon = entries.get(`extension/${manifest.icon}`);
+  assert.ok(icon && icon.length >= 24, '安装包必须包含图标文件');
+  assert.equal(icon.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', '插件图标必须为有效 PNG');
+  assert.ok(icon.readUInt32BE(16) >= 128 && icon.readUInt32BE(20) >= 128, '图标尺寸不能小于 128×128');
+  assert.ok(entries.get('extension.vsixmanifest').toString('utf8').includes('Microsoft.VisualStudio.Services.Icons.Default'), '市场清单必须包含插件图标资源');
   assert.ok(entries.has('extension/LICENSE.txt'));
   assert.ok([...entries.keys()].every(file => !file.includes('/tests/') && !file.includes('/node_modules/') && !file.includes('/logs/')));
   assert.ok([...entries.values()].every(content => !content.includes('CODEX_SPEED_TEST_HOME')));
   const sha256 = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
   fs.writeFileSync(`${file}.sha256`, `${sha256}  ${sourceManifest.name}-${sourceManifest.version}.vsix\n`);
-  console.log(`VSIX 验证通过：${entries.size} 个文件，Publisher=${manifest.publisher}，版本=${manifest.version}，路径全部为 ASCII 且无重名，入口和中英文说明完整。`);
+  console.log(`VSIX 验证通过：${entries.size} 个文件，Publisher=${manifest.publisher}，版本=${manifest.version}，路径全部为 ASCII 且无重名，入口、PNG 图标和中英文市场首页完整。`);
   console.log(`SHA-256: ${sha256}`);
 }
 

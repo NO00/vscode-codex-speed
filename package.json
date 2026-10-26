@@ -1,9 +1,14 @@
 {
   "name": "vscode-codex-speed",
   "displayName": "VSCode Codex Speed",
-  "description": "读取 Remote SSH 主机的 Codex 会话日志，在状态栏显示输出 token/s、估算状态和最近调用速度。",
-  "version": "0.1.1",
+  "description": "Monitor Codex output token/s in the VS Code status bar, including Remote SSH. 在状态栏查看 Codex 输出速度。",
+  "version": "0.1.2",
   "publisher": "NO00",
+  "icon": "assets/icon.png",
+  "galleryBanner": {
+    "color": "#101B2E",
+    "theme": "dark"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
