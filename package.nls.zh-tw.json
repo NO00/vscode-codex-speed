@@ -20,5 +20,6 @@
   "config.pollIntervalMs": "日誌增量讀取和狀態列更新間隔（毫秒）。",
   "config.scanDays": "尋找最近多少天內更新的日誌；仍會繼續追蹤已找到的舊工作階段。",
   "config.showEstimates": "生成中使用近期實測速率估算，並在數字前顯示 ~。關閉後在生成中等待新的實測記錄。",
-  "config.priceOverrides": "依模型設定每百萬 token 的美元單價：input（一般輸入）、cachedInput（快取輸入）、output（輸出）。精確模型名稱覆蓋離線標準單價；可選 longContext 設定閾值及倍率。改價立即重算保留用量，僅估算 API 等值費用，不代表實際帳單。"
+  "config.priceOverrides": "依模型設定每百萬 token 的美元單價：input（一般輸入）、cachedInput（快取輸入）、output（輸出）。精確模型名稱覆蓋離線標準單價；可選 longContext 設定閾值及倍率。改價立即重算保留用量，僅估算 API 等值費用，不代表實際帳單。",
+  "config.priceOverrides.cacheWrites": "此模型是否獨立計收快取寫入費用。已知模型繼承官方規則，未知模型預設 true；僅確認模型沒有獨立寫入價時設為 false。否則缺少寫入計數時不替剩餘輸入猜價。"
 }

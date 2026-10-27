@@ -55,15 +55,17 @@
         const part = row[key], detail = document.createElement('span');
         const name = document.createElement('span'); name.className = 'small muted'; name.textContent = labels[label];
         const value = document.createElement('span'); value.textContent = dollars(part.usd, row.source !== 'unknown' && (part.pricedTokens > 0 || row.complete === row.responses));
-        const count = document.createElement('span'); count.className = 'small muted'; count.textContent = `${number(part.tokens, true)} tokens`;
+        const count = document.createElement('span'); count.className = 'small muted';
+        const unknownCount = key !== 'output' && part.tokens === 0 && (row.unknownInput > 0 || row.missingInput > 0);
+        count.textContent = `${unknownCount ? '—' : number(part.tokens, true)} tokens`;
         const rate = row.price?.[key === 'ordinary' ? 'input' : key === 'cached' ? 'cachedInput' : 'output'];
-        detail.title = `${number(part.pricedTokens)} / ${number(part.tokens)} tokens${rate !== undefined ? ` · ${rate} ${labels.priceUnit}` : ''}`;
+        detail.title = `${unknownCount ? labels.incomplete : `${number(part.pricedTokens)} / ${number(part.tokens)} tokens`}${rate !== undefined ? ` · ${rate} ${labels.priceUnit}` : ''}`;
         detail.append(name, value, count); parts.append(detail);
       }
       item.append(parts); container.append(item);
     }
     const warnings = [!complete ? labels.costPartial : '', cost.unknownInput ? `${labels.unknownInput}: ${number(cost.unknownInput)}` : '',
-      cost.missingInput ? `${labels.missingInput}: ${number(cost.missingInput)}` : '', cost.cacheWrites ? `${labels.cacheWrites}: ${number(cost.cacheWrites)}` : ''].filter(Boolean);
+      cost.missingInput ? `${labels.missingInput}: ${number(cost.missingInput)}` : '', cost.missingWrites ? `${labels.missingWrites}: ${number(cost.missingWrites)}` : '', cost.cacheWrites ? `${labels.cacheWrites}: ${number(cost.cacheWrites)}` : ''].filter(Boolean);
     text('cost-warning', warnings.join(' · ')); document.getElementById('cost-warning').hidden = !warnings.length;
   }
   /** 绘制重建后的一秒桶：蓝线是实测部分，蓝绿虚线是含估算的合计。 */

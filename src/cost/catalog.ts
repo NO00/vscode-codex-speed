@@ -7,13 +7,15 @@ export const PRICE_DATE = '2026-10-27';
 const longContext = { threshold: 272000, input: 2, cachedInput: 2, output: 1.5 };
 /** 只收录核对过的模型；不把相似名称自动映射到别的收费模型。 */
 const builtin: Readonly<Record<string, ModelPrice>> = {
-  'gpt-6-astra': { input: 10, cachedInput: 1, output: 50, longContext },
-  'gpt-6.1-sol': { input: 2, cachedInput: 0.1, output: 10, longContext },
-  'gpt-6.1-terra': { input: 1, cachedInput: 0.05, output: 5, longContext },
-  'gpt-6-luna': { input: 0.1, cachedInput: 0.01, output: 0.5, longContext },
-  'gpt-5.6-sol': { input: 4, cachedInput: 0.4, output: 20, longContext },
-  'gpt-5.3-codex': { input: 1.75, cachedInput: 0.175, output: 14 }
+  'gpt-6-astra': { input: 10, cachedInput: 1, output: 50, cacheWrites: true, longContext },
+  'gpt-6.1-sol': { input: 2, cachedInput: 0.1, output: 10, cacheWrites: true, longContext },
+  'gpt-6.1-terra': { input: 1, cachedInput: 0.05, output: 5, cacheWrites: true, longContext },
+  'gpt-6-luna': { input: 0.1, cachedInput: 0.01, output: 0.5, cacheWrites: true, longContext },
+  'gpt-5.6-sol': { input: 4, cachedInput: 0.4, output: 20, cacheWrites: true, longContext },
+  'gpt-5.3-codex': { input: 1.75, cachedInput: 0.175, output: 14, cacheWrites: false }
 };
+/** 仅使用官方模型文档明确声明的别名，不剥除任意日期后缀猜价格。 */
+const aliases: Readonly<Record<string, string>> = { 'gpt-5.6': 'gpt-5.6-sol' };
 
 /** 只接受普通 JSON 对象，拒绝数组和空值。 */
 function object(value: unknown): Record<string, unknown> | undefined {
@@ -28,6 +30,10 @@ function price(value: unknown): ModelPrice | null {
   const p = object(value);
   if (!p || !valid(p.input) || !valid(p.cachedInput) || !valid(p.output)) return null;
   const result: ModelPrice = { input: p.input, cachedInput: p.cachedInput, output: p.output };
+  if (p.cacheWrites !== undefined) {
+    if (typeof p.cacheWrites !== 'boolean') return null;
+    result.cacheWrites = p.cacheWrites;
+  }
   if (p.longContext !== undefined) {
     const rule = object(p.longContext);
     if (!rule || !valid(rule.threshold) || !Number.isSafeInteger(rule.threshold) || !valid(rule.input) || !valid(rule.cachedInput) || !valid(rule.output)) return null;
@@ -45,13 +51,13 @@ export function createPriceBook(settings: unknown = {}): PriceBook {
 /** 默认查询共享同一个离线价格表，不增加任何联网请求。 */
 export const defaultPrices = createPriceBook();
 
-/** 优先精确匹配自定义条目，其次匹配内置名及明确的日期快照后缀。 */
+/** 优先精确匹配自定义条目，其次只匹配内置名及已核实的官方别名。 */
 export function findPrice(model: string, book: PriceBook): { price?: ModelPrice; source: 'builtin' | 'custom' | 'unknown' } {
-  const base = model.replace(/-\d{4}-\d{2}-\d{2}$/, '');
+  const base = Object.hasOwn(aliases, model) ? aliases[model]! : model;
   const p = Object.hasOwn(builtin, base) ? builtin[base] : undefined;
   if (book.overrides.has(model)) {
     const custom = book.overrides.get(model);
-    return custom ? { price: { ...custom, longContext: custom.longContext ?? p?.longContext }, source: 'custom' } : { source: 'unknown' };
+    return custom ? { price: { ...custom, cacheWrites: custom.cacheWrites ?? p?.cacheWrites ?? true, longContext: custom.longContext ?? p?.longContext }, source: 'custom' } : { source: 'unknown' };
   }
   return p ? { price: p, source: 'builtin' } : { source: 'unknown' };
 }

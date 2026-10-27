@@ -20,5 +20,6 @@
   "config.pollIntervalMs": "Interval for reading log updates and refreshing the status bar, in milliseconds.",
   "config.scanDays": "Discover logs modified within this many days; already discovered older sessions remain tracked.",
   "config.showEstimates": "Estimate generation speed from recent measured rates and prefix it with ~. When disabled, wait for new measured counts during generation.",
-  "config.priceOverrides": "Per-model USD prices per million tokens: input, cachedInput, output. Exact model IDs override offline Standard prices; optional longContext specifies threshold and multipliers. Changes reprice retained usage immediately. This estimates API equivalent, not actual billing."
+  "config.priceOverrides": "Per-model USD prices per million tokens: input, cachedInput, output. Exact model IDs override offline Standard prices; optional longContext specifies threshold and multipliers. Changes reprice retained usage immediately. This estimates API equivalent, not actual billing.",
+  "config.priceOverrides.cacheWrites": "Whether this model has a separate cache-write tariff. Known models inherit the official policy; unknown models default to true. Set false only when the model has no separate write tariff. Missing write counts otherwise leave uncached input unpriced."
 }

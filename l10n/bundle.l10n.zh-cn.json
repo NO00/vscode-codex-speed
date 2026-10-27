@@ -100,6 +100,7 @@
   "No completed usage in this period.": "此时间范围内没有已完成的用量记录。",
   "Input tokens without a cache split": "无法拆分缓存的输入 token",
   "Responses without input counts": "缺少输入计数的响应",
+  "Responses without cache-write counts": "缺少缓存写入计数的响应",
   "Excluded cache-write tokens": "未计费的缓存写入 token",
   "Long-context pricing applied": "已应用长上下文加价",
   "Offline Standard API equivalent, not your Codex bill. Uses the displayed price snapshot for all selected records. Excludes cache writes, tools, service-tier and regional charges.": "按离线标准 API 单价估算，不代表 Codex 实际账单。所选记录均采用当前价格快照；不含缓存写入、工具、服务档位和地区附加费用。",

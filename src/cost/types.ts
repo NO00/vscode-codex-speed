@@ -2,6 +2,8 @@
 export interface ModelPrice {
   /** 普通输入、缓存读取、输出的标准单价。 */
   input: number; cachedInput: number; output: number;
+  /** 是否存在独立缓存写入计费；缺省按可能存在处理，不能把缺失写入数当零。 */
+  cacheWrites?: boolean;
   /** 超过阈值后的三项倍率；未提供时不额外加价。 */
   longContext?: { threshold: number; input: number; cachedInput: number; output: number };
 }
@@ -31,7 +33,7 @@ export interface ModelCost {
   /** 已知美元小计；完整响应数、全部响应数。 */
   usd: number; complete: number; responses: number;
   /** 分类未知的输入、无法确定输入总量的响应、被排除的写入数。 */
-  unknownInput: number; missingInput: number; cacheWrites: number;
+  unknownInput: number; missingInput: number; missingWrites: number; cacheWrites: number;
   /** 适用长上下文加价的响应数量。 */
   longContextResponses: number;
 }
@@ -43,7 +45,7 @@ export interface CostSummary {
   /** 已知金额及三种费用分项。 */
   usd: number; ordinary: CostPart; cached: CostPart; output: CostPart;
   /** 完整计价的响应覆盖率及未知信息，完整零费用仍可明确显示零。 */
-  complete: number; responses: number; unknownInput: number; missingInput: number; cacheWrites: number;
+  complete: number; responses: number; unknownInput: number; missingInput: number; missingWrites: number; cacheWrites: number;
   /** 离线内置价格快照日期，不表示旧调用发生时的历史单价。 */
   priceDate: string;
 }

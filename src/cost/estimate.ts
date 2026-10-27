@@ -20,7 +20,7 @@ export function estimateCost(samples: Iterable<Sample>, book: PriceBook = defaul
     if (!row) {
       const found = findPrice(model, book);
       row = { model, ...found, ordinary: part(), cached: part(), output: part(), usd: 0, complete: 0, responses: 0,
-        unknownInput: 0, missingInput: 0, cacheWrites: 0, longContextResponses: 0 };
+        unknownInput: 0, missingInput: 0, missingWrites: 0, cacheWrites: 0, longContextResponses: 0 };
       models.set(model, row);
     }
     row.responses++;
@@ -32,23 +32,32 @@ export function estimateCost(samples: Iterable<Sample>, book: PriceBook = defaul
     const price = rateKnown ? row.price : undefined;
     if (long) row.longContextResponses++;
     add(row.output, sample.output, price ? price.output * (long ? rule!.output : 1) : undefined);
-    const writes = sample.cacheWriteInput ?? 0;
     const cached = sample.cachedInput ?? (inputKnown && sample.input === 0 ? 0 : undefined);
-    const validSplit = inputKnown && cached !== undefined && cached + writes <= sample.input;
+    // 全输入均为缓存命中或模型没有写入价时，可由上下界确定零写入；其余缺失保持未知。
+    const writes = sample.cacheWriteInput ?? (inputKnown && cached === sample.input || row.price?.cacheWrites === false ? 0 : undefined);
+    const cachedValid = inputKnown && cached !== undefined && cached <= sample.input;
+    const validSplit = cachedValid && writes !== undefined && cached + writes <= sample.input;
     if (validSplit) {
       add(row.ordinary, sample.input - cached - writes, price ? price.input * (long ? rule!.input : 1) : undefined);
       add(row.cached, cached, price ? price.cachedInput * (long ? rule!.cachedInput : 1) : undefined);
       row.cacheWrites += writes;
-    } else if (inputKnown) row.unknownInput += sample.input;
-    else row.missingInput++;
+    } else if (cachedValid && writes === undefined) {
+      // 缓存读取与输出仍可计价；剩余输入可能是写入，不能按普通输入单价冒充已知费用。
+      add(row.cached, cached, price ? price.cachedInput * (long ? rule!.cachedInput : 1) : undefined);
+      row.unknownInput += sample.input - cached; row.missingWrites++;
+    } else {
+      if (inputKnown) row.unknownInput += sample.input;
+      else row.missingInput++;
+      if (sample.cacheWriteInput !== undefined) row.cacheWrites += sample.cacheWriteInput;
+    }
     if (price && validSplit && writes === 0) row.complete++;
     row.usd = row.ordinary.usd + row.cached.usd + row.output.usd;
   }
   const result: CostSummary = { models: [...models.values()].sort((a, b) => b.usd - a.usd || a.model.localeCompare(b.model)),
-    ordinary: part(), cached: part(), output: part(), usd: 0, complete: 0, responses: 0, unknownInput: 0, missingInput: 0, cacheWrites: 0, priceDate: PRICE_DATE };
+    ordinary: part(), cached: part(), output: part(), usd: 0, complete: 0, responses: 0, unknownInput: 0, missingInput: 0, missingWrites: 0, cacheWrites: 0, priceDate: PRICE_DATE };
   for (const row of result.models) {
     for (const key of ['ordinary', 'cached', 'output'] as const) for (const field of ['tokens', 'pricedTokens', 'usd'] as const) result[key][field] += row[key][field];
-    for (const key of ['usd', 'complete', 'responses', 'unknownInput', 'missingInput', 'cacheWrites'] as const) result[key] += row[key];
+    for (const key of ['usd', 'complete', 'responses', 'unknownInput', 'missingInput', 'missingWrites', 'cacheWrites'] as const) result[key] += row[key];
   }
   return result;
 }

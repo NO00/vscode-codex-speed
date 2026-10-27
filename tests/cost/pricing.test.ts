@@ -18,7 +18,7 @@ import { row } from '../helpers';
 const now = Date.parse('2026-10-27T08:00:00Z');
 /** 所有数值都取自虚拟记录，可按需求覆盖字段制造缺失或边界。 */
 function sample(changes: Partial<Sample> = {}): Sample {
-  return { key: 'r', start: now - 2000, end: now - 1000, input: 100000, inputKnown: true, cachedInput: 80000, output: 10000, model: 'gpt-6.1-sol', ...changes };
+  return { key: 'r', start: now - 2000, end: now - 1000, input: 100000, inputKnown: true, cachedInput: 80000, cacheWriteInput: 0, output: 10000, model: 'gpt-6.1-sol', ...changes };
 }
 /** 金额保留完整浮点精度，只在显示时舍入。 */
 function near(actual: number, expected: number): void { assert.ok(Math.abs(actual - expected) < 1e-10, `${actual} != ${expected}`); }
@@ -29,9 +29,9 @@ test('普通输入先减去缓存输入，再分别乘以模型单价，reasonin
   assert.equal(result.complete, 1); assert.equal(result.ordinary.tokens, 20000); assert.equal(result.cached.tokens, 80000);
 });
 
-test('多模型各自计价，日期快照可解析，名称相似或服务档位后缀不猜价格', () => {
+test('多模型各自计价，未核实的日期、相似名称或服务档位后缀不猜价格', () => {
   near(estimateCost([sample(), sample({ key: 'b', model: 'gpt-6-astra' })]).usd, .928);
-  assert.equal(findPrice('gpt-6.1-sol-2026-10-20', defaultPrices).source, 'builtin');
+  assert.equal(findPrice('gpt-6.1-sol-2026-10-20', defaultPrices).source, 'unknown');
   assert.equal(findPrice('gpt-6.1-sol-fast', defaultPrices).source, 'unknown');
   assert.equal(findPrice('toString', defaultPrices).source, 'unknown');
 });
@@ -97,9 +97,9 @@ test('现代日志保存每次响应模型，兼容扁平缓存和 API 详情字
 test('旧版缓存计数差分在检查点恢复后连续，重复累计快照不重复计费', () => {
   const first = new CodexParser('/fixture');
   first.consume(row(now - 3000, 'turn_context', { model: 'gpt-6.1-sol' }));
-  first.consume(row(now - 2000, 'event_msg', { type: 'token_count', info: { total_token_usage: { input_tokens: 100, cached_input_tokens: 80, output_tokens: 10, total_tokens: 110 } } }));
+  first.consume(row(now - 2000, 'event_msg', { type: 'token_count', info: { total_token_usage: { input_tokens: 100, cached_input_tokens: 80, cache_write_tokens: 0, output_tokens: 10, total_tokens: 110 } } }));
   const restored = new CodexParser('/fixture'); restored.restore(first.checkpoint());
-  const next = row(now - 1000, 'event_msg', { type: 'token_count', info: { total_token_usage: { input_tokens: 250, cached_input_tokens: 180, output_tokens: 30, total_tokens: 280 } } });
+  const next = row(now - 1000, 'event_msg', { type: 'token_count', info: { total_token_usage: { input_tokens: 250, cached_input_tokens: 180, cache_write_tokens: 0, output_tokens: 30, total_tokens: 280 } } });
   restored.consume(next); restored.consume(next);
   assert.equal(restored.samples.length, 1); assert.equal(restored.samples[0]!.input, 150); assert.equal(restored.samples[0]!.cachedInput, 100);
   near(estimateCost([...first.samples, ...restored.samples]).usd, 70 * 2 / 1000000 + 180 * .1 / 1000000 + 30 * 10 / 1000000);
@@ -135,10 +135,10 @@ test('历史超过实时去重容量后再次出现同一响应，保留原始�
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-cost-duplicate-')), file = path.join(root, 'a.jsonl');
   try {
     const lines = Array.from({ length: 1002 }, (_, index) => row(now - 20000 + index, 'token_usage_record', {
-      response_id: `r-${index}`, model: 'gpt-6.1-sol', usage: { input_tokens: 100, cached_input_tokens: 80, output_tokens: 10 }
+      response_id: `r-${index}`, model: 'gpt-6.1-sol', usage: { input_tokens: 100, cached_input_tokens: 80, cache_write_tokens: 0, output_tokens: 10 }
     }));
     await fs.writeFile(file, [row(now - 21000, 'event_msg', { type: 'user_message' }), ...lines,
-      row(now - 1000, 'token_usage_record', { response_id: 'r-0', model: 'gpt-6.1-sol', usage: { input_tokens: 100, cached_input_tokens: 80, output_tokens: 10 } })].join('\n') + '\n');
+      row(now - 1000, 'token_usage_record', { response_id: 'r-0', model: 'gpt-6.1-sol', usage: { input_tokens: 100, cached_input_tokens: 80, cache_write_tokens: 0, output_tokens: 10 } })].join('\n') + '\n');
     const state = emptyFile(file); await readHistoryFile(state, 4 * 1024 * 1024, now - 86400000, 10000);
     assert.equal(state.records.length, 1002); assert.equal(state.records[0]!.end, now - 20000);
     const cost = estimateCost(state.records); assert.equal(cost.complete, 1002); near(cost.usd, .000148 * 1002);
@@ -152,7 +152,7 @@ test('旧缓存费用元数据按预算回填，原统计不丢失且不重复�
   try {
     await fs.mkdir(path.dirname(file), { recursive: true });
     await fs.writeFile(file, [row(now - 5000, 'session_meta', { id: 'a', cwd: '/project' }), row(now - 4000, 'turn_context', { model: 'gpt-6.1-sol' }),
-      row(now - 1000, 'token_usage_record', { response_id: 'r', usage: { input_tokens: 100000, cached_input_tokens: 80000, output_tokens: 10000 } })].join('\n') + '\n');
+      row(now - 1000, 'token_usage_record', { response_id: 'r', usage: { input_tokens: 100000, cached_input_tokens: 80000, cache_write_tokens: 0, output_tokens: 10000 } })].join('\n') + '\n');
     const state = emptyFile(file); await readHistoryFile(state, 65536, now - 86400000, 100);
     delete state.costVersion; state.records[0]!.model = ''; delete state.records[0]!.cachedInput; delete state.records[0]!.inputKnown;
     const store = new HistoryCacheStore(storage, path.resolve(home)); await store.open(); await store.save([state], true); await store.release();

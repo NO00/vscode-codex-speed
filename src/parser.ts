@@ -149,7 +149,7 @@ export class CodexParser implements Session {
     if (total && this.previous) {
       const fields = ['input_tokens', 'output_tokens', 'total_tokens'];
       const delta = Object.fromEntries(fields.map(k => [k, tokens(total[k]) - tokens(this.previous?.[k])]));
-      if (delta.total_tokens === 0 && delta.output_tokens === 0 && delta.input_tokens === 0) return;
+      if (delta.total_tokens === 0 && delta.output_tokens === 0 && delta.input_tokens === 0) { this.previous = total; return; }
       usage = Object.values(delta).some(n => n < 0) ? last : delta;
       if (usage === delta) {
         // 累计缓存计数也必须差分；缺失不能当作零，否则会把缓存读取错算为普通输入。

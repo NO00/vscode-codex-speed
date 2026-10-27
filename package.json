@@ -83,6 +83,7 @@
               "input": { "type": "number", "minimum": 0, "maximum": 1000000 },
               "cachedInput": { "type": "number", "minimum": 0, "maximum": 1000000 },
               "output": { "type": "number", "minimum": 0, "maximum": 1000000 },
+              "cacheWrites": { "type": "boolean", "description": "%config.priceOverrides.cacheWrites%" },
               "longContext": {
                 "type": "object",
                 "required": ["threshold", "input", "cachedInput", "output"],

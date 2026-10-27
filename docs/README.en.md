@@ -32,6 +32,8 @@ The dashboard shows USD totals, uncached input, cached input and output costs, w
 
 Uncached input subtracts cache hits and separately reported cache writes from total input. Reasoning is already included in output. Unknown models remain **Unpriced**; missing input or cache details produce a **Known subtotal** with coverage information. Separately logged cache writes, tool charges, service tiers (Fast/Flex/Batch, etc.) and regional premiums are excluded. In-flight speed estimates never create usage charges.
 
+For models with a separate cache-write tariff, missing write counts leave uncached input unpriced: only confirmed cache reads and output are included. Zero input, fully cached input, or a supported model without a separate write tariff establishes zero writes. The optional override `cacheWrites: false` is only appropriate when the model has no separate write tariff; otherwise it defaults to the known model policy or `true` for unknown models. Unverified date-suffixed model IDs require their own exact price entry.
+
 Older caches are enriched incrementally from available logs without discarding existing counts. Deleted logs cannot supply missing metadata; their counts remain but may be unpriced. Raw counts, not monetary totals, are cached so price changes reprice retained usage immediately.
 
 Set `codexSpeed.priceOverrides` in User or Remote JSON settings. Each exact model ID requires `input`, `cachedInput` and `output` in **USD per million tokens**. Zero prices are valid. Built-in models inherit their known long-context rule unless an explicit `longContext` rule overrides it; unknown models have no inferred surcharge. No API key or extra network call is required.

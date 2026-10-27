@@ -55,7 +55,7 @@ export async function run(): Promise<void> {
       row(now - 5000, 'session_meta', { id: 'host-test', cwd: '/project' }),
       row(now - 4500, 'turn_context', { model: 'gpt-6.1-sol' }),
       row(now - 4000, 'event_msg', { type: 'task_started' }),
-      row(now - 1000, 'token_usage_record', { response_id: 'one', usage: { output_tokens: 300, input_tokens: 1000, cached_input_tokens: 800 } }),
+      row(now - 1000, 'token_usage_record', { response_id: 'one', usage: { output_tokens: 300, input_tokens: 1000, cached_input_tokens: 800, cache_write_tokens: 0 } }),
       row(now - 900, 'event_msg', { type: 'task_complete' })
     ].join('\n') + '\n');
     await vscode.commands.executeCommand('codexSpeed.refresh');
@@ -77,6 +77,14 @@ export async function run(): Promise<void> {
     await waitFor(d => d.dashboardRender?.costUSD === 0 && d.dashboardRender.pricedResponses === 1 && d.state?.snapshot.output === 300);
     await vscode.workspace.getConfiguration('codexSpeed').update('priceOverrides', {}, vscode.ConfigurationTarget.Global);
     await waitFor(d => Math.abs((d.dashboardRender?.costUSD ?? 0) - .00348) < .00000001);
+    // 同一份虚拟日志缺少写入数时，前端应显示部分计价而非假定普通输入。
+    const initialUsage = await fs.readFile(file, 'utf8');
+    await fs.writeFile(file, initialUsage.replace(',"cache_write_tokens":0', ''));
+    await vscode.commands.executeCommand('codexSpeed.refresh');
+    await waitFor(d => d.dashboardRender?.pricedResponses === 0 && Math.abs((d.dashboardRender.costUSD ?? 0) - .00308) < .00000001);
+    await fs.writeFile(file, initialUsage);
+    await vscode.commands.executeCommand('codexSpeed.refresh');
+    await waitFor(d => d.dashboardRender?.pricedResponses === 1 && Math.abs((d.dashboardRender.costUSD ?? 0) - .00348) < .00000001);
     const oldFile = path.join(home, 'sessions', 'historical.jsonl');
     await fs.writeFile(oldFile, [row(now - 2 * 86400000 - 3000, 'session_meta', { id: 'historical', cwd: '/project' }),
       row(now - 2 * 86400000 - 2000, 'event_msg', { type: 'user_message' }),

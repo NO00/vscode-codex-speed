@@ -15,7 +15,7 @@ const sessions = ['vscode-codex-speed', 'api-service', 'docs'].map((name, index)
   phase: ['generating', 'tools', 'idle'][index], pendingStart: now - 5000, lastEvent: now - (index === 2 ? 400000 : 1000),
   samples: Array.from({ length: 24 }, (_, item) => ({ key: `${name}:${item}`, start: now - 720000 + item * 30000 + index * 1500,
     end: now - 720000 + item * 30000 + index * 1500 + 8000 + item % 4 * 2000, output: 500 + (item % 5) * 160 + index * 120, input: 11000 + item * 170,
-    inputKnown: true, cachedInput: 8000 + item * 100, model: index === 1 ? 'gpt-6.1-sol' : 'gpt-6-astra' }))
+    inputKnown: true, cachedInput: 8000 + item * 100, cacheWriteInput: 0, model: index === 1 ? 'gpt-6.1-sol' : 'gpt-6-astra' }))
 }));
 const history = new DashboardHistory();
 /** 生成与真实 Webview 相同的数据及翻译，只改变日志来源为虚拟记录。 */
@@ -36,15 +36,18 @@ function payload(selectedLanguage, selectedRange = 'today', selectedZone = 'Asia
         ...(scenario === 'corrected' ? [{ key: 'late-usage', start: now - 20000, end: now - 2000, output: 900, input: 1000, model: 'gpt-6-astra' }] : [])] }];
   }
   if (scenario === 'partial-cost') currentSessions = [{ ...sessions[0], samples: [
-    { key: 'known', start: now - 2000, end: now - 1000, input: 100000, inputKnown: true, cachedInput: 80000, output: 10000, model: 'gpt-6.1-sol' },
+    { key: 'known', start: now - 2000, end: now - 1000, input: 100000, inputKnown: true, cachedInput: 80000, cacheWriteInput: 0, output: 10000, model: 'gpt-6.1-sol' },
     { key: 'missing-cache', start: now - 2000, end: now - 1000, input: 100000, inputKnown: true, output: 10000, model: 'gpt-6.1-sol' },
-    { key: 'unknown-model', start: now - 2000, end: now - 1000, input: 100000, inputKnown: true, cachedInput: 80000, output: 10000, model: 'private-model' }
+    { key: 'unknown-model', start: now - 2000, end: now - 1000, input: 100000, inputKnown: true, cachedInput: 80000, cacheWriteInput: 0, output: 10000, model: 'private-model' }
   ] }];
-  if (scenario === 'tiny-cost') currentSessions = [{ ...sessions[0], samples: [{ key: 'tiny', start: now - 2000, end: now - 1000, input: 1, inputKnown: true, cachedInput: 0, output: 0, model: 'gpt-6.1-sol' }] }];
+  if (scenario === 'missing-writes') currentSessions = [{ ...sessions[0], samples: [
+    { key: 'missing-writes', start: now - 2000, end: now - 1000, input: 100000, inputKnown: true, cachedInput: 80000, output: 10000, model: 'gpt-6.1-sol' }
+  ] }];
+  if (scenario === 'tiny-cost') currentSessions = [{ ...sessions[0], samples: [{ key: 'tiny', start: now - 2000, end: now - 1000, input: 1, inputKnown: true, cachedInput: 0, cacheWriteInput: 0, output: 0, model: 'gpt-6.1-sol' }] }];
   const currentSnapshot = calculate(currentSessions, options, now);
   const records = currentSessions.flatMap(session => [...session.samples.map(sample => ({ ...sample, cwd: session.cwd, session: session.id })),
     ...[7200000, 2 * 86400000, 5 * 86400000, 12 * 86400000, 25 * 86400000].map((age, index) => ({ key: `${session.id}:old:${index}`, start: now - age - 10000, end: now - age,
-      input: 50000, inputKnown: true, cachedInput: 40000, output: 3000, model: session.model, cwd: session.cwd, session: session.id }))]);
+      input: 50000, inputKnown: true, cachedInput: 40000, cacheWriteInput: 0, output: 3000, model: session.model, cwd: session.cwd, session: session.id }))]);
   const totals = summarize(records, usageRange(selectedRange), validTimeZone(selectedZone), options, now);
   return { data: history.data(currentSessions, options, currentSnapshot, now, totals), labels: dashboardMessages(t), locale, selectedLanguage,
     context: { host: 'ssh-remote / ubuntu', home: options.home, scope: 'all', notice: '', error: false, limited: false, enabled: true } };

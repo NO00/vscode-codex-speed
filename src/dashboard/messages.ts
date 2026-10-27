@@ -24,6 +24,7 @@ export function dashboardMessages(t: Translate): Record<string, string> {
     pricedResponses: t('Fully priced responses'), priceSnapshot: t('Price snapshot'), priceUnit: t('USD / 1M tokens'),
     standardPrice: t('Standard'), customPrice: t('Custom'), costEmpty: t('No completed usage in this period.'),
     unknownInput: t('Input tokens without a cache split'), missingInput: t('Responses without input counts'),
+    missingWrites: t('Responses without cache-write counts'),
     cacheWrites: t('Excluded cache-write tokens'), longContextPrice: t('Long-context pricing applied'),
     costNote: t('Offline Standard API equivalent, not your Codex bill. Uses the displayed price snapshot for all selected records. Excludes cache writes, tools, service-tier and regional charges.'),
     costPartial: t('Some usage is unpriced or lacks input details. Only known charges are included.'),

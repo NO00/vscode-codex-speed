@@ -42,6 +42,8 @@ Codex 0.0 tok/s          无当前输出 / No current output
 
 这不是 Codex 实际账单。未知模型显示“未计价”；日志缺少输入或缓存拆分时显示已知小计及覆盖率，不按零价处理。单列的缓存写入、工具、服务档位和地区附加费用不包含。旧缓存会渐进补齐元数据，无法读取的旧日志保留用量但可能无法计价。
 
+有独立缓存写入价格的模型若缺少写入计数，剩余输入无法确定为普通输入；此时只合计能够确认的缓存读取与输出，显示缺失提示。日期型号不会自动套用未经核实的价格。
+
 可点击“配置模型单价”，或在用户／远程设置中填写 `"codexSpeed.priceOverrides": { "gpt-6.1-sol": { "input": 2, "cachedInput": 0.1, "output": 10 } }`。单位为美元／百万 token，改价立即重算；界面语言切换继续生效。
 
 ### 安装后怎么用
@@ -123,6 +125,8 @@ The console uses blue measured lines and teal estimate lines. Wide windows show 
 The cost card follows the selected usage period and workspace scope, showing a USD total plus uncached input, cached input and output costs for each model. Completed records use the offline [OpenAI Standard API price snapshot](https://developers.openai.com/api/docs/pricing), verified **2026-10-27**, including known long-context adjustments. No API key or additional model request is needed.
 
 This is not your actual Codex bill. Unknown models remain **Unpriced**. Missing input or cache details produce a **Known subtotal** and coverage information. Separately reported cache writes, tools, service tiers and regional premiums are excluded. Older caches are progressively enriched from available logs; deleted logs retain their counts but may remain unpriced.
+
+When a model has a separate cache-write tariff but logs omit write counts, the remaining input is not assumed uncached: only confirmed cache reads and output are included, with a missing-count warning. Unverified date-suffixed model IDs do not inherit prices automatically.
 
 Click **Configure model prices**, or set `"codexSpeed.priceOverrides": { "gpt-6.1-sol": { "input": 2, "cachedInput": 0.1, "output": 10 } }` in User or Remote JSON settings. Rates are USD per million tokens. Changes reprice retained usage immediately, and language switching remains available.
 
