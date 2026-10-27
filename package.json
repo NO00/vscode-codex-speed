@@ -2,7 +2,7 @@
   "name": "vscode-codex-speed",
   "displayName": "VSCode Codex Speed",
   "description": "%extension.description%",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "publisher": "NO00",
   "icon": "assets/icon.png",
   "galleryBanner": {

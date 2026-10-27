@@ -10,7 +10,7 @@
 
 悬停状态栏显示简洁摘要；点击直接打开仪表盘，也可执行 **Codex Speed: 打开仪表盘**。面板采用蓝色与浅蓝绿色的开发者监控台布局：宽屏将实时读数与趋势图并排，用量数据横向排列，会话以表格展示并带短 ID；窄窗口自动转为紧凑卡片。蓝色实线为实测部分，浅蓝绿色虚线为含估算合计。面板提供：
 
-- 数字式实时读数及实测、估算、等待、工具和空闲状态，不再使用圆形速度表。
+- 数字式实时读数及实测、估算、等待、工具和空闲状态。
 - 1／2／5 分钟曲线，每秒桶分别保存实测和估算，收到完成计数后按调用区间重建历史，替换对应在途估算。蓝线为实测部分，浅蓝绿色虚线为含估算合计；悬停或使用方向键可查看时间、实测、估算与占比。
 - 会话名称、模型、阶段、输出数量及响应数，工作区范围和镜像去重规则沿用监控设置。
 - 可选近 30 分钟、今天、近 7 天、近 30 天的输入、输出、响应数与加权平均速度，默认“今天”。今天按仪表盘客户端时区划分，近 7／30 天是滚动的 7／30 × 24 小时。近五分钟监测峰值仍来自实时曲线，可能含估算。输入可能含缓存 token，平均速度仅使用耗时已知的已完成调用。
@@ -37,7 +37,7 @@
 ## 安装到 Remote SSH
 
 1. 在本机 VS Code 使用 **Remote - SSH** 连接服务器，并打开一个远程目录。
-2. 按 `Ctrl+Shift+P`，执行 **Extensions: Install from VSIX...（扩展：从 VSIX 安装）**，选择 `vscode-codex-speed-0.1.8.vsix`。
+2. 按 `Ctrl+Shift+P`，执行 **Extensions: Install from VSIX...（扩展：从 VSIX 安装）**，选择 `vscode-codex-speed-0.1.9.vsix`。
 3. 在扩展面板确认 **VSCode Codex Speed** 位于 **SSH: 服务器名 — 已安装**。如果只安装在本地，点击扩展上的 **Install in SSH: 服务器名**。必要时执行 **Developer: Reload Window**。
 4. 在服务器上以同一个用户运行 Codex。底部状态栏会出现 `Codex … tok/s`；新会话自动发现最多约需 5 秒，之后默认每半秒读取新增日志。点击状态栏打开仪表盘，使用面板顶部按钮重新扫描或打开设置。
 
@@ -128,7 +128,7 @@ Windows 真实宿主测试示例：
 
 若本机为使用版本子目录的 Windows 安装，且更新锁阻止启动，可使用 `bash scripts/host-test.sh --copy-installed "/path/to/VS Code"`。脚本把当前版本复制到 `.vscode-test/isolated-installed`，仅在副本的产品元数据中关闭 Windows 安装器更新协调，原安装保持只读。这适合验证当前已安装版本，不代表最低版本验证。
 
-产物位于 `artifacts/vscode-codex-speed-0.1.8.vsix`。从 0.1.2 起，打包使用 `docs/MARKETPLACE.md` 作为面向使用者的中英文首页，独立 PNG 图标位于 `assets/icon.png`；0.1.3 同时包含清单和运行时翻译资源。详细的中英文 README 仅保留在仓库。服务器不需要安装 Node.js 依赖。为兼容 Marketplace 上传端，包内路径只使用 ASCII 字符；设计和验证文档见 `docs/设计说明.md` 与 `docs/验证记录.md`。
+产物位于 `artifacts/vscode-codex-speed-0.1.9.vsix`。从 0.1.2 起，打包使用 `docs/MARKETPLACE.md` 作为面向使用者的中英文首页，独立 PNG 图标位于 `assets/icon.png`；0.1.3 同时包含清单和运行时翻译资源。详细的中英文 README 仅保留在仓库。服务器不需要安装 Node.js 依赖。为兼容 Marketplace 上传端，包内路径只使用 ASCII 字符；设计和验证文档见 `docs/设计说明.md` 与 `docs/验证记录.md`。
 
 `bash scripts/check-package.sh` 可独立校验现有安装包；也可在命令末尾传入待检查的 VSIX 路径。检查包括路径编码退化后的重名、非 ASCII 路径、实际 Publisher、版本、入口和中英文使用说明。
 

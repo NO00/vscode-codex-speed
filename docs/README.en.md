@@ -14,7 +14,7 @@ The extension runs as a `workspace` extension. In a remote window, it reads Code
 
 Hover over the status item for a compact summary. Click it, or run **Codex Speed: Open Dashboard**, to open the dashboard beside your editor. It includes a digital speed readout, measured/estimated state, 1/2/5-minute charts, session/model/phase summaries, and usage statistics for the last 30 minutes, today, the last 7 days or the last 30 days. Today is the default and follows the dashboard client’s time zone; 7/30-day windows are rolling 7/30 × 24 hours. The toolbar contains language selection, rescan and Settings. Connection metadata, including the client time zone, is available in an expandable details section.
 
-The console uses blue for measured speed and teal for estimates. Wide windows place the live reading beside the trend chart, show usage in a horizontal strip, and align sessions in a table with short IDs. Narrow windows switch to compact cards. The circular gauge has been removed.
+The console uses blue for measured speed and teal for estimates. Wide windows place the live reading beside the trend chart, show usage in a horizontal strip, and align sessions in a table with short IDs. Narrow windows switch to compact cards.
 
 The chart rebuilds 300 one-second buckets from available parsed records. Completed usage reconstructs the response interval and replaces its in-flight estimate. Blue shows the measured component; teal dashed segments show totals that include estimates. Hover, or focus the chart and use arrow keys, to inspect time, measured output, estimates and their share. Startup, late records and reopening can reconstruct recent history from available logs. The main readout is a three-second average, whereas the chart has one-second values; the current unfinished second only contains its covered portion. The last completed call stays separate from the live reading.
 
@@ -37,7 +37,7 @@ Command Palette titles and Settings descriptions always follow the VS Code displ
 ## Install in a Remote SSH window
 
 1. Connect to your server using **Remote - SSH** and open a remote folder.
-2. Open the Command Palette and run **Extensions: Install from VSIX...**. Select `vscode-codex-speed-0.1.8.vsix`.
+2. Open the Command Palette and run **Extensions: Install from VSIX...**. Select `vscode-codex-speed-0.1.9.vsix`.
 3. Confirm that **VSCode Codex Speed** appears under **SSH: your-server — Installed** in the Extensions view. If it is installed only locally, select **Install in SSH: your-server**. Run **Developer: Reload Window** if needed.
 4. Run Codex on the server as the same user. The status bar will show `Codex … tok/s`. New sessions are normally discovered within about five seconds, and existing logs are polled every second by default. Click the item to open the dashboard, whose toolbar offers rescanning and Settings.
 
@@ -142,7 +142,7 @@ If no executable path is supplied, `@vscode/test-electron` downloads a separate 
 
 For a Windows installation using version subdirectories, an updater lock may prevent a new instance from starting. Use `bash scripts/host-test.sh --copy-installed "/path/to/VS Code"` to create an isolated copy under `.vscode-test/isolated-installed`. Only that copy's product metadata is adjusted to disable Windows installer update coordination; the original installation remains read-only. This tests the installed version, not necessarily the minimum supported version.
 
-The package is generated at `artifacts/vscode-codex-speed-0.1.8.vsix`. Starting with 0.1.2, `docs/MARKETPLACE.md` supplies the bilingual user-facing Marketplace overview, and `assets/icon.png` supplies the extension's own icon. Version 0.1.3 includes manifest and runtime translations. The detailed Chinese/English README files remain in the repository. No Node.js dependency installation is required on the server. All VSIX paths use ASCII characters for upload compatibility. Architecture and validation documents remain in the source repository at `docs/设计说明.md` and `docs/验证记录.md`.
+The package is generated at `artifacts/vscode-codex-speed-0.1.9.vsix`. Starting with 0.1.2, `docs/MARKETPLACE.md` supplies the bilingual user-facing Marketplace overview, and `assets/icon.png` supplies the extension's own icon. Version 0.1.3 includes manifest and runtime translations. The detailed Chinese/English README files remain in the repository. No Node.js dependency installation is required on the server. All VSIX paths use ASCII characters for upload compatibility. Architecture and validation documents remain in the source repository at `docs/设计说明.md` and `docs/验证记录.md`.
 
 Run `bash scripts/check-package.sh` to inspect an existing package, optionally passing a VSIX path. Checks reject duplicate paths after lossy ASCII conversion, non-ASCII paths, incorrect publisher/version metadata, and missing entry points or user documentation.
 
