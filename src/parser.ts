@@ -20,8 +20,8 @@ export interface ParserCheckpoint {
   id: string; cwd: string; model: string;
   /** 未完成调用和流式响应状态。 */
   phase: Phase; pendingStart?: number; lastEvent: number; created?: number; streaming: boolean; modern: boolean;
-  /** 旧日志的上一份累计计数，仅允许三项数值。 */
-  previous?: { input_tokens: number; output_tokens: number; total_tokens: number };
+  /** 旧日志的上一份累计计数，缓存字段缺失时保留未知。 */
+  previous?: { input_tokens?: number; output_tokens: number; total_tokens: number; cached_input_tokens?: number; cache_write_tokens?: number };
 }
 
 /** 解析现代及旧版 Codex rollout；仅保留计数、时间、模型和路径。 */
@@ -60,7 +60,8 @@ export class CodexParser implements Session {
   checkpoint(): ParserCheckpoint {
     return { id: this.id, cwd: this.cwd, model: this.model, phase: this.phase, pendingStart: this.pendingStart, lastEvent: this.lastEvent,
       created: this.created, streaming: this.streaming, modern: this.modern,
-      previous: this.previous ? { input_tokens: tokens(this.previous.input_tokens), output_tokens: tokens(this.previous.output_tokens), total_tokens: tokens(this.previous.total_tokens) } : undefined };
+      previous: this.previous ? { input_tokens: count(this.previous.input_tokens), output_tokens: tokens(this.previous.output_tokens), total_tokens: tokens(this.previous.total_tokens),
+        cached_input_tokens: this.cacheCount(this.previous), cache_write_tokens: this.writeCount(this.previous) } : undefined };
   }
 
   /** 只恢复解析状态，近期速度样本仍按实时读取器的原有规则积累。 */
@@ -135,7 +136,7 @@ export class CodexParser implements Session {
     if (!usage || count(usage.output_tokens) === undefined) return;
     this.modern = true;
     const key = typeof p.response_id === 'string' ? p.response_id : `modern:${this.id}:${time}`;
-    this.add(key, usage, time);
+    this.add(key, usage, time, typeof p.model === 'string' ? p.model : this.model);
   }
 
   /** 旧版使用累计值差分；重复累计快照忽略，计数回退时采用 last_token_usage。 */
@@ -150,6 +151,16 @@ export class CodexParser implements Session {
       const delta = Object.fromEntries(fields.map(k => [k, tokens(total[k]) - tokens(this.previous?.[k])]));
       if (delta.total_tokens === 0 && delta.output_tokens === 0 && delta.input_tokens === 0) return;
       usage = Object.values(delta).some(n => n < 0) ? last : delta;
+      if (usage === delta) {
+        // 累计缓存计数也必须差分；缺失不能当作零，否则会把缓存读取错算为普通输入。
+        const sameLast = last && count(last.input_tokens) === delta.input_tokens && count(last.output_tokens) === delta.output_tokens;
+        for (const [field, read] of [['cached_input_tokens', this.cacheCount], ['cache_write_tokens', this.writeCount]] as const) {
+          const current = read(total), previous = read(this.previous);
+          const value = current !== undefined && previous !== undefined && current >= previous ? current - previous : sameLast ? read(last!) : undefined;
+          if (value !== undefined) usage[field] = value;
+        }
+        if (count(total.input_tokens) === undefined || count(this.previous.input_tokens) === undefined) delete usage.input_tokens;
+      }
     }
     this.previous = total;
     if (!usage || count(usage.output_tokens) === undefined) return;
@@ -158,10 +169,11 @@ export class CodexParser implements Session {
   }
 
   /** 保存响应并维护容量上限；输出计数已经包含 reasoning，不再次相加。 */
-  private add(key: string, usage: Record<string, unknown>, time: number): void {
+  private add(key: string, usage: Record<string, unknown>, time: number, model = this.model): void {
     if (this.keys.has(key)) return;
     this.keys.add(key);
-    const sample = { key, start: this.pendingStart, end: time, output: tokens(usage.output_tokens), input: tokens(usage.input_tokens), model: this.model };
+    const sample: Sample = { key, start: this.pendingStart, end: time, output: tokens(usage.output_tokens), input: tokens(usage.input_tokens),
+      inputKnown: count(usage.input_tokens) !== undefined, cachedInput: this.cacheCount(usage), cacheWriteInput: this.writeCount(usage), model };
     this.samples.push(sample);
     this.onSample?.(sample);
     this.endResponse(time);
@@ -169,6 +181,16 @@ export class CodexParser implements Session {
       const old = this.samples.shift();
       if (old) this.keys.delete(old.key);
     }
+  }
+
+  /** 同时兼容 Codex 扁平计数与 Responses API 的输入详情字段。 */
+  private cacheCount(usage: Record<string, unknown>): number | undefined {
+    return count(usage.cached_input_tokens) ?? count(object(usage.input_tokens_details)?.cached_tokens);
+  }
+
+  /** 缓存写入单独保留，本版本明确排除，避免按普通输入单价错误计费。 */
+  private writeCount(usage: Record<string, unknown>): number | undefined {
+    return count(usage.cache_write_tokens) ?? count(object(usage.input_tokens_details)?.cache_write_tokens);
   }
 
   /** 用量完成后进入工具阶段，等待工具结果或整轮完成事件。 */

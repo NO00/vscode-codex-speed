@@ -12,6 +12,7 @@ import { dashboardMessages } from './dashboard/messages';
 import { DashboardPanel, DashboardPayload } from './dashboard/panel';
 import { UsageIndex } from './history';
 import { usageRange, validTimeZone } from './history/ranges';
+import { createPriceBook } from './cost/catalog';
 
 /** 使用客户端显示语言；Remote SSH 宿主不读取服务器系统语言。 */
 let translate: Translate = vscode.l10n.t;
@@ -89,6 +90,8 @@ export function activate(context: vscode.ExtensionContext): void {
   const host = `${vscode.env.remoteName ?? 'local'} / ${os.hostname()}`;
   let state: MonitorState | undefined;
   let options = readOptions();
+  /** 单价只在配置变化时校验，改价不重启监控或重新读取日志。 */
+  let prices = createPriceBook(vscode.workspace.getConfiguration('codexSpeed').get('priceOverrides', {}));
   let history = new DashboardHistory();
   /** 历史缓存按 Codex Home 隔离，保存在扩展宿主的 globalStorage 下。 */
   let usageIndex: UsageIndex | undefined;
@@ -100,7 +103,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const snapshot = state?.snapshot ?? calculate([], options, Date.now());
     const sessions = monitor ? [...monitor.tailers.values()].map(item => item.parser) : [];
     const selectedRange = usageRange(vscode.workspace.getConfiguration('codexSpeed').get('usageRange', 'today'));
-    return { data: history.data(sessions, options, snapshot, Date.now(), usageIndex?.query(selectedRange, timeZone, options, sessions), usageIndex?.status),
+    return { data: history.data(sessions, options, snapshot, Date.now(), usageIndex?.query(selectedRange, timeZone, options, sessions, prices), usageIndex?.status, prices),
       labels: dashboardMessages(t), locale: uiLanguage,
       selectedLanguage: vscode.workspace.getConfiguration('codexSpeed').get<string>('language', 'auto'),
       context: { host, home: options.home, scope: options.scope, notice: state?.notice ?? '', error: state?.error ?? false,
@@ -108,6 +111,7 @@ export function activate(context: vscode.ExtensionContext): void {
   }
   const dashboard = new DashboardPanel(context.extensionUri, dashboardPayload, {
     refresh: () => { void vscode.commands.executeCommand('codexSpeed.refresh'); }, settings: () => { void vscode.commands.executeCommand('codexSpeed.openSettings'); },
+    prices: () => { void vscode.commands.executeCommand('workbench.action.openSettings', 'codexSpeed.priceOverrides'); },
     language: value => { void vscode.workspace.getConfiguration('codexSpeed').update('language', value, vscode.ConfigurationTarget.Global); },
     usageRange: value => { void vscode.workspace.getConfiguration('codexSpeed').update('usageRange', value, vscode.ConfigurationTarget.Global); },
     timeZone: value => { const next = validTimeZone(value); if (next !== timeZone) { timeZone = next; void context.globalState.update('usage.timeZone', next); } }
@@ -185,6 +189,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidChangeConfiguration(event => {
       if (!event.affectsConfiguration('codexSpeed')) return;
       if (event.affectsConfiguration('codexSpeed.language')) configureLanguage();
+      if (event.affectsConfiguration('codexSpeed.priceOverrides')) prices = createPriceBook(vscode.workspace.getConfiguration('codexSpeed').get('priceOverrides', {}));
       // 只切换语言时保留监控状态，强制刷新目录提示，无需重新扫描会话内容。
       if (['enabled', 'codexHome', 'scope', 'pollIntervalMs', 'scanDays', 'showEstimates'].some(key => event.affectsConfiguration(`codexSpeed.${key}`))) restart();
       else void render(true);

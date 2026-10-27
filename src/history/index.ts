@@ -6,6 +6,8 @@ import { HistoryCacheStore, MAX_FILES, MAX_RECORDS } from './cache';
 import { emptyFile, readHistoryFile } from './reader';
 import { summarize } from './ranges';
 import { HistoryStatus, IndexedFile, UsageRange, UsageRecord, UsageSummary } from './types';
+import { defaultPrices } from '../cost/catalog';
+import { PriceBook } from '../cost/types';
 
 /** 历史索引最多保留三十天，发现和读取均分批执行。 */
 const RETENTION = 30 * 86400000;
@@ -60,26 +62,26 @@ export class UsageIndex {
   /** 当前完整性提示，不将初次回填当成完整的零用量。 */
   get status(): HistoryStatus {
     let scanned = 0;
-    for (const [file, target] of this.targets) { const state = this.files.get(file); if (state && state.offset >= target.size && state.mtime === target.mtime) scanned++; }
+    for (const [file, target] of this.targets) { const state = this.files.get(file); if (state?.costVersion === 1 && state.offset >= target.size && state.mtime === target.mtime) scanned++; }
     const follower = this.loaded && !this.cache.owner;
-    if (follower) scanned = [...this.files.values()].filter(file => file.offset >= file.size).length;
+    if (follower) scanned = [...this.files.values()].filter(file => file.costVersion === 1 && file.offset >= file.size).length;
     return { indexing: !this.loaded || (follower ? !this.cache.complete : !!this.discovery || scanned < this.targets.size), scanned, total: follower ? this.files.size : this.targets.size,
       limited: this.limited, readErrors: this.readErrors, cacheError: this.cache.error, cacheReset: this.cache.reset, follower: !this.cache.owner };
   }
 
   /** 按响应 ID 合并实时尾部；首次索引尚未结束时也能显示已知的当前用量。 */
-  query(range: UsageRange, timeZone: string, options: MonitorOptions, live: Session[] = []): UsageSummary {
+  query(range: UsageRange, timeZone: string, options: MonitorOptions, live: Session[] = [], prices: PriceBook = defaultPrices): UsageSummary {
     const now = this.clock();
     const liveSignature = live.map(session => `${session.id}:${session.cwd}:${session.samples.length}:${session.samples.at(-1)?.key ?? ''}`).join('|');
-    const key = `${this.revision}:${Math.floor(now / 1000)}:${range}:${timeZone}:${options.scope}:${options.workspaces.join('|')}:${liveSignature}`;
+    const key = `${this.revision}:${Math.floor(now / 1000)}:${range}:${timeZone}:${options.scope}:${options.workspaces.join('|')}:${liveSignature}:${prices.signature}`;
     if (this.memo?.key === key) return this.memo.value;
     const files = this.files;
     /** 惰性遍历计数，不复制整个三十天数组。 */
     function* records(): Generator<UsageRecord> {
       for (const state of files.values()) yield* state.records;
-      for (const session of live) for (const sample of session.samples) yield { ...sample, model: '', cwd: session.cwd, session: session.id };
+      for (const session of live) for (const sample of session.samples) yield { ...sample, cwd: session.cwd, session: session.id };
     }
-    const value = summarize(records(), range, timeZone, options, now); this.memo = { key, value }; return value;
+    const value = summarize(records(), range, timeZone, options, now, prices); this.memo = { key, value }; return value;
   }
 
   /** 每次最多推进一批目录项和四 MiB 日志，保存时游标与计数一致。 */
@@ -117,11 +119,11 @@ export class UsageIndex {
       const [file, target] = targets[this.cursor++ % targets.length]!;
       if (records >= MAX_RECORDS || this.files.size >= MAX_FILES && !this.files.has(file)) { this.limited = true; break; }
       let state = this.files.get(file);
-      if (state && state.offset >= target.size && state.mtime === target.mtime) continue;
+      if (state?.costVersion === 1 && state.offset >= target.size && state.mtime === target.mtime) continue;
       visited++;
       if (!state) { state = emptyFile(file); this.files.set(file, state); }
       const before = state.records.length;
-      const cursor = `${state.offset}:${state.size}:${state.mtime}:${state.identity}`;
+      const cursor = `${state.offset}:${state.size}:${state.mtime}:${state.identity}:${state.costVersion}`;
       try {
         budget -= await readHistoryFile(state, budget, now - RETENTION, MAX_RECORDS - records);
         this.targets.set(file, { size: state.size, mtime: state.mtime });
@@ -131,7 +133,7 @@ export class UsageIndex {
         else this.readErrors++;
       }
       records += state.records.length - before; this.revision++;
-      if (before !== state.records.length || cursor !== `${state.offset}:${state.size}:${state.mtime}:${state.identity}`) this.dirty = true;
+      if (before !== state.records.length || cursor !== `${state.offset}:${state.size}:${state.mtime}:${state.identity}:${state.costVersion}`) this.dirty = true;
     }
     const complete = !this.status.indexing && !this.limited && !this.readErrors;
     if (complete !== this.cache.complete) this.dirty = true;

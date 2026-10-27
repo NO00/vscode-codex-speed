@@ -2,13 +2,15 @@ import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 import { CodexParser } from '../parser';
 import { IndexedFile } from './types';
+import { measured } from '../engine';
+import { enrichUsage } from '../cost/usage';
 
 /** 与实时读取器相同的单行上限，历史读取从文件开头而非尾部开始。 */
 const MAX_LINE = 2 * 1024 * 1024;
 
 /** 创建只保存断点和计数的文件项。 */
 export function emptyFile(file: string): IndexedFile {
-  return { file, identity: '', mtime: 0, size: 0, offset: 0, skipping: false, anchor: '', parser: new CodexParser(file).checkpoint(), records: [] };
+  return { file, identity: '', mtime: 0, size: 0, offset: 0, skipping: false, anchor: '', costVersion: 1, parser: new CodexParser(file).checkpoint(), records: [] };
 }
 
 /** 读取偏移之前的短哈希，检测截断后在下一次扫描前又增长的日志。 */
@@ -26,12 +28,21 @@ export async function readHistoryFile(state: IndexedFile, budget: number, cutoff
     if (state.identity !== identity || stat.size < state.offset || state.offset && state.anchor !== await anchor(handle, state.offset)) {
       Object.assign(state, emptyFile(state.file)); state.identity = identity;
     }
+    if (state.costVersion !== 1) {
+      // 旧版未保存模型和缓存命中数；保留原计数，分批重放后按响应身份原位补齐。
+      state.offset = 0; state.anchor = ''; state.skipping = false; state.parser = new CodexParser(state.file).checkpoint(); state.costVersion = 1;
+    }
     let parser: CodexParser;
-    const keys = new Set(state.records.map(record => record.key));
+    const keys = new Map(state.records.map((record, index) => [record.key, index]));
     parser = new CodexParser(state.file, sample => {
-      if (sample.end >= cutoff && !keys.has(sample.key)) {
-        state.records.push({ ...sample, model: '', cwd: parser.cwd, session: parser.id }); room--;
-        keys.add(sample.key);
+      if (sample.end >= cutoff) {
+        const record = { ...sample, cwd: parser.cwd, session: parser.id }, existing = keys.get(sample.key);
+        if (existing !== undefined) {
+          const old = state.records[existing]!;
+          // 旧缓存首次重放使用完整新元数据；之后的重复通知只补缺失项，不覆盖原耗时。
+          state.records[existing] = old.inputKnown === undefined ? record : !measured(old) && measured(record) ? enrichUsage(record, old) : enrichUsage(old, record);
+        }
+        else { keys.set(sample.key, state.records.length); state.records.push(record); room--; }
       }
     });
     parser.restore(state.parser);

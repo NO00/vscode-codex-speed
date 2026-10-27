@@ -1,10 +1,11 @@
 import { ParserCheckpoint } from '../parser';
 import { Sample } from '../types';
+import { CostSummary } from '../cost/types';
 
 /** 用量时间范围，今天以仪表盘所在客户端的 IANA 时区划分。 */
 export type UsageRange = '30m' | 'today' | '7d' | '30d';
 
-/** 可持久化的响应计数，空 model 占位不会存储模型输出或原始行。 */
+/** 可持久化的响应计数及计价模型，不存储模型输出或原始行。 */
 export interface UsageRecord extends Sample {
   /** 响应发生时的目录，用于切换工作区范围。 */
   cwd: string;
@@ -22,6 +23,8 @@ export interface IndexedFile {
   offset: number; skipping: boolean;
   /** 偏移前一小段字节的哈希，用于发现截断后快速重新增长的文件。 */
   anchor: string;
+  /** 费用元数据版本；旧缓存需从原日志增量回填，但保留已有计数。 */
+  costVersion?: 1;
   /** 最后一条完整事件后的解析状态。 */
   parser: ParserCheckpoint;
   /** 近三十天的已解析用量。 */
@@ -64,6 +67,8 @@ export interface UsageSummary {
   range: UsageRange; from: number; until: number; timeZone: string;
   /** 去重计数和基于已知耗时的平均输出速度。 */
   input: number; output: number; responses: number; average: number;
+  /** 对同一批去重响应按离线单价计算的 API 等值费用。 */
+  cost: CostSummary;
   /** 只在宿主内部使用，不直接传入 Webview。 */
   bySession: Map<string, { input: number; output: number; responses: number }>;
 }

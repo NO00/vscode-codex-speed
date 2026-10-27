@@ -2,7 +2,7 @@
   "name": "vscode-codex-speed",
   "displayName": "VSCode Codex Speed",
   "description": "%extension.description%",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "publisher": "NO00",
   "icon": "assets/icon.png",
   "galleryBanner": {
@@ -70,6 +70,33 @@
     "configuration": {
       "title": "VSCode Codex Speed",
       "properties": {
+        "codexSpeed.priceOverrides": {
+          "type": "object",
+          "default": {},
+          "description": "%config.priceOverrides%",
+          "scope": "machine",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["input", "cachedInput", "output"],
+            "additionalProperties": false,
+            "properties": {
+              "input": { "type": "number", "minimum": 0, "maximum": 1000000 },
+              "cachedInput": { "type": "number", "minimum": 0, "maximum": 1000000 },
+              "output": { "type": "number", "minimum": 0, "maximum": 1000000 },
+              "longContext": {
+                "type": "object",
+                "required": ["threshold", "input", "cachedInput", "output"],
+                "additionalProperties": false,
+                "properties": {
+                  "threshold": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+                  "input": { "type": "number", "minimum": 0, "maximum": 1000000 },
+                  "cachedInput": { "type": "number", "minimum": 0, "maximum": 1000000 },
+                  "output": { "type": "number", "minimum": 0, "maximum": 1000000 }
+                }
+              }
+            }
+          }
+        },
         "codexSpeed.usageRange": {
           "type": "string",
           "enum": ["30m", "today", "7d", "30d"],

@@ -19,5 +19,6 @@
   "config.scope": "选择需要统计的会话范围。",
   "config.pollIntervalMs": "日志增量读取和状态栏刷新间隔（毫秒）。",
   "config.scanDays": "发现最近多少天内更新的日志；仍会继续跟踪已发现的旧会话。",
-  "config.showEstimates": "生成中使用近期实测速率估算，并在数字前显示 ~。关闭后生成中等待新的实测记录。"
+  "config.showEstimates": "生成中使用近期实测速率估算，并在数字前显示 ~。关闭后生成中等待新的实测记录。",
+  "config.priceOverrides": "按模型配置每百万 token 的美元单价：input（普通输入）、cachedInput（缓存输入）、output（输出）。精确模型名覆盖离线标准单价；可选 longContext 配置阈值及倍率。改价立即重算保留用量，仅估算 API 等值费用，不代表实际账单。"
 }

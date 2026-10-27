@@ -51,7 +51,7 @@ async function main() {
   assert.ok(entries.get('extension.vsixmanifest').toString('utf8').includes('Microsoft.VisualStudio.Services.Icons.Default'), '市场清单必须包含插件图标资源');
   assert.ok(entries.has('extension/LICENSE.txt'));
   assert.equal(manifest.l10n, './l10n', '必须声明运行时翻译目录');
-  for (const file of ['assets/dashboard/dashboard.css', 'assets/dashboard/dashboard.js', 'dist/src/dashboard/model.js', 'dist/src/dashboard/html.js', 'dist/src/dashboard/messages.js', 'dist/src/dashboard/panel.js', 'dist/src/history/index.js', 'dist/src/history/cache.js', 'dist/src/history/reader.js', 'dist/src/history/ranges.js']) {
+  for (const file of ['assets/dashboard/dashboard.css', 'assets/dashboard/dashboard.js', 'dist/src/dashboard/model.js', 'dist/src/dashboard/html.js', 'dist/src/dashboard/messages.js', 'dist/src/dashboard/panel.js', 'dist/src/history/index.js', 'dist/src/history/cache.js', 'dist/src/history/reader.js', 'dist/src/history/ranges.js', 'dist/src/cost/catalog.js', 'dist/src/cost/estimate.js', 'dist/src/cost/usage.js']) {
     assert.ok(entries.has(`extension/${file}`), `仪表盘资源缺失：${file}`);
   }
   assert.ok(manifest.contributes.commands.some(command => command.command === 'codexSpeed.openDashboard'), '必须声明仪表盘命令');

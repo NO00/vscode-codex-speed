@@ -20,6 +20,7 @@ Codex 0.0 tok/s          无当前输出 / No current output
 - 在 Remote SSH 窗口读取服务器上的 Codex 日志，不用手动同步日志或再次配置 SSH 连接。
 - 汇总多个会话和子 agent，也可以只查看当前工作区中的会话。
 - 点击状态栏打开仪表盘：数字读数、1／2／5 分钟曲线、会话列表及可切换范围的用量。
+- 按模型估算 API 等值美元费用，拆分普通输入、缓存输入与输出，支持自定义单价。
 
 这是独立的社区扩展，不属于 OpenAI 官方产品。界面默认跟随 VS Code 显示语言，支持英文、简体中文和繁体中文；其他语言使用英文。
 
@@ -33,7 +34,15 @@ Codex 0.0 tok/s          无当前输出 / No current output
 
 首次使用会分批索引历史，显示进度及不完整提示。缓存保存计数与读取断点，重启后继续增量读取；只支持 `sessions` 目录下近 30 天内更新的未压缩 JSONL。缓存文件保存在扩展存储目录，Codex 日志保持只读。
 
-监控台采用蓝色实测线和浅蓝绿色估算线：宽屏为并排趋势区、横向用量数据和会话表格，窄窗口转为紧凑卡片。顶部可选择语言、重新扫描或打开设置，连接信息在下方按需展开。关闭面板后仍按已有监控周期采样，未增加额外扫描计时器；没有费用或网络流量统计。
+监控台采用蓝色实测线和浅蓝绿色估算线：宽屏为并排趋势区、横向用量数据和会话表格，窄窗口转为紧凑卡片。顶部可选择语言、重新扫描或打开设置，连接信息在下方按需展开。关闭面板后仍按已有监控周期采样，未增加额外扫描计时器；不监测网络流量。
+
+### API 等值费用
+
+费用卡片随用量时间范围和工作区范围更新，显示美元总额、普通输入／缓存输入／输出费用及模型明细。按离线 [OpenAI 标准 API 价格快照](https://developers.openai.com/api/docs/pricing)估算所选完成记录，当前快照为 **2026-10-27**，并处理已核对模型的长上下文加价。无需 API Key，不增加模型请求。
+
+这不是 Codex 实际账单。未知模型显示“未计价”；日志缺少输入或缓存拆分时显示已知小计及覆盖率，不按零价处理。单列的缓存写入、工具、服务档位和地区附加费用不包含。旧缓存会渐进补齐元数据，无法读取的旧日志保留用量但可能无法计价。
+
+可点击“配置模型单价”，或在用户／远程设置中填写 `"codexSpeed.priceOverrides": { "gpt-6.1-sol": { "input": 2, "cachedInput": 0.1, "output": 10 } }`。单位为美元／百万 token，改价立即重算；界面语言切换继续生效。
 
 ### 安装后怎么用
 
@@ -70,6 +79,7 @@ Codex 0.0 tok/s          无当前输出 / No current output
 | 设置 | 默认值 | 用途 |
 | --- | --- | --- |
 | `codexSpeed.usageRange` | `today` | 用量范围，可选 `30m`、`today`、`7d`、`30d` |
+| `codexSpeed.priceOverrides` | `{}` | 每模型的普通输入、缓存输入及输出美元单价（每百万 token） |
 | `codexSpeed.language` | `auto` | 跟随 VS Code，或手动选择 `en`、`zh-cn`、`zh-tw`，立即生效 |
 | `codexSpeed.scope` | `all` | 改为 `workspace`，仅查看当前工作区中的会话 |
 | `codexSpeed.showEstimates` | `true` | 改为 `false`，生成中等待完成记录再显示实测结果 |
@@ -94,6 +104,7 @@ Codex 0.0 tok/s          无当前输出 / No current output
 - Direct log monitoring on your Remote SSH host, with no manual log synchronization or extra SSH connection setup.
 - Combined readings for multiple sessions and subagents, or a view limited to your workspace folders.
 - A dashboard with a digital speed readout, 1/2/5-minute charts, session summaries and selectable usage periods.
+- API-equivalent USD estimates by model, separating uncached input, cached input and output, with configurable prices.
 
 This is an independent community extension, not an official OpenAI product. The UI follows the VS Code display language by default. English, Simplified Chinese and Traditional Chinese are supported; other languages fall back to English.
 
@@ -105,7 +116,15 @@ Hover for a compact summary, or click to open the dashboard. Core Codex speed fo
 
 Usage supports the last 30 minutes, today, the last 7 days and the last 30 days. Today follows the client time zone; 7/30-day periods use rolling hours. Input may include cached tokens; averages use timed completed calls. The five-minute monitored peak can include estimates and is corrected with reconstructed history.
 
-The console uses blue measured lines and teal estimate lines. Wide windows show the reading beside its trend, a horizontal usage strip and a session table; narrow windows use compact cards. Language, rescan and Settings are in the toolbar, with connection metadata in expandable details. Closing the dashboard keeps the existing status-bar sampling active, without another scanning timer. Cost and network traffic tracking are not included.
+The console uses blue measured lines and teal estimate lines. Wide windows show the reading beside its trend, a horizontal usage strip and a session table; narrow windows use compact cards. Language, rescan and Settings are in the toolbar, with connection metadata in expandable details. Closing the dashboard keeps the existing status-bar sampling active, without another scanning timer. Network traffic tracking is not included.
+
+### API-equivalent cost
+
+The cost card follows the selected usage period and workspace scope, showing a USD total plus uncached input, cached input and output costs for each model. Completed records use the offline [OpenAI Standard API price snapshot](https://developers.openai.com/api/docs/pricing), verified **2026-10-27**, including known long-context adjustments. No API key or additional model request is needed.
+
+This is not your actual Codex bill. Unknown models remain **Unpriced**. Missing input or cache details produce a **Known subtotal** and coverage information. Separately reported cache writes, tools, service tiers and regional premiums are excluded. Older caches are progressively enriched from available logs; deleted logs retain their counts but may remain unpriced.
+
+Click **Configure model prices**, or set `"codexSpeed.priceOverrides": { "gpt-6.1-sol": { "input": 2, "cachedInput": 0.1, "output": 10 } }` in User or Remote JSON settings. Rates are USD per million tokens. Changes reprice retained usage immediately, and language switching remains available.
 
 ### Get started
 
@@ -138,6 +157,7 @@ Historical usage is indexed in batches from uncompressed JSONL files under `sess
 | Setting | Default | Purpose |
 | --- | --- | --- |
 | `codexSpeed.usageRange` | `today` | Usage period: `30m`, `today`, `7d` or `30d` |
+| `codexSpeed.priceOverrides` | `{}` | Per-model uncached input, cached input and output USD prices per million tokens |
 | `codexSpeed.language` | `auto` | Follow VS Code or manually select `en`, `zh-cn` or `zh-tw`; applies immediately |
 | `codexSpeed.scope` | `all` | Use `workspace` to include only sessions inside the current workspace folders |
 | `codexSpeed.showEstimates` | `true` | Set to `false` to wait for completed usage records rather than show generation estimates |

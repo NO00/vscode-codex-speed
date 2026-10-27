@@ -1,6 +1,10 @@
 import { inWorkspace, measured, sampleDuration } from '../engine';
 import { MonitorOptions } from '../types';
 import { UsageRange, UsageRecord, UsageSummary } from './types';
+import { defaultPrices } from '../cost/catalog';
+import { PriceBook } from '../cost/types';
+import { estimateCost } from '../cost/estimate';
+import { enrichUsage } from '../cost/usage';
 
 /** 配置和 Webview 消息都只能选择既定时间范围。 */
 export function usageRange(value: unknown): UsageRange { return value === '30m' || value === '7d' || value === '30d' ? value : 'today'; }
@@ -28,13 +32,14 @@ export function rangeStart(range: UsageRange, now: number, timeZone: string): nu
 
 /** 合并缓存和实时尾部的响应身份，避免回填完成前缺少当前用量或重复累加。 */
 export function summarize(records: Iterable<UsageRecord>, range: UsageRange, timeZone: string,
-  options: Pick<MonitorOptions, 'scope' | 'workspaces'>, now: number): UsageSummary {
+  options: Pick<MonitorOptions, 'scope' | 'workspaces'>, now: number, prices: PriceBook = defaultPrices): UsageSummary {
   const zone = validTimeZone(timeZone), from = rangeStart(range, now, zone);
   const unique = new Map<string, UsageRecord>();
   for (const record of records) {
     if (record.end < from || record.end > now || options.scope === 'workspace' && !inWorkspace(record.cwd, options.workspaces)) continue;
     const old = unique.get(record.key);
-    if (!old || !measured(old) && measured(record)) unique.set(record.key, record);
+    if (!old) unique.set(record.key, record);
+    else unique.set(record.key, !measured(old) && measured(record) ? enrichUsage(record, old) : enrichUsage(old, record));
   }
   const bySession: UsageSummary['bySession'] = new Map();
   let input = 0, output = 0, timedOutput = 0, duration = 0;
@@ -44,5 +49,5 @@ export function summarize(records: Iterable<UsageRecord>, range: UsageRange, tim
     const totals = bySession.get(record.session) ?? { input: 0, output: 0, responses: 0 };
     totals.input += record.input; totals.output += record.output; totals.responses++; bySession.set(record.session, totals);
   }
-  return { range, from, until: now, timeZone: zone, input, output, responses: unique.size, average: duration ? timedOutput * 1000 / duration : 0, bySession };
+  return { range, from, until: now, timeZone: zone, input, output, responses: unique.size, average: duration ? timedOutput * 1000 / duration : 0, cost: estimateCost(unique.values(), prices), bySession };
 }

@@ -16,7 +16,7 @@ interface Diagnostics {
   home: string;
   /** 实际 Webview 可见状态及前端回传的渲染确认。 */
   dashboardVisible: boolean;
-  dashboardRender?: { locale: string; sessions: number; usageRange?: string; output?: number; estimatedBuckets?: number; measuredBuckets?: number };
+  dashboardRender?: { locale: string; sessions: number; usageRange?: string; output?: number; estimatedBuckets?: number; measuredBuckets?: number; costUSD?: number; pricedResponses?: number };
 }
 
 /** 等待异步状态栏刷新，在限定时间内失败而不是永久阻塞。 */
@@ -53,8 +53,9 @@ export async function run(): Promise<void> {
     let now = Date.now();
     await fs.writeFile(file, [
       row(now - 5000, 'session_meta', { id: 'host-test', cwd: '/project' }),
+      row(now - 4500, 'turn_context', { model: 'gpt-6.1-sol' }),
       row(now - 4000, 'event_msg', { type: 'task_started' }),
-      row(now - 1000, 'token_usage_record', { response_id: 'one', usage: { output_tokens: 300 } }),
+      row(now - 1000, 'token_usage_record', { response_id: 'one', usage: { output_tokens: 300, input_tokens: 1000, cached_input_tokens: 800 } }),
       row(now - 900, 'event_msg', { type: 'task_complete' })
     ].join('\n') + '\n');
     await vscode.commands.executeCommand('codexSpeed.refresh');
@@ -70,6 +71,12 @@ export async function run(): Promise<void> {
     await vscode.commands.executeCommand('codexSpeed.showDetails');
     await waitFor(d => d.dashboardVisible && d.dashboardRender?.sessions === 1);
     await waitFor(d => d.dashboardRender?.usageRange === 'today' && d.dashboardRender.output === 300);
+    await waitFor(d => d.dashboardRender?.pricedResponses === 1 && Math.abs((d.dashboardRender.costUSD ?? 0) - .00348) < .00000001);
+    // 修改单价即时重算，不重启监控，输出计数和语言切换均保留。
+    await vscode.workspace.getConfiguration('codexSpeed').update('priceOverrides', { 'gpt-6.1-sol': { input: 0, cachedInput: 0, output: 0 } }, vscode.ConfigurationTarget.Global);
+    await waitFor(d => d.dashboardRender?.costUSD === 0 && d.dashboardRender.pricedResponses === 1 && d.state?.snapshot.output === 300);
+    await vscode.workspace.getConfiguration('codexSpeed').update('priceOverrides', {}, vscode.ConfigurationTarget.Global);
+    await waitFor(d => Math.abs((d.dashboardRender?.costUSD ?? 0) - .00348) < .00000001);
     const oldFile = path.join(home, 'sessions', 'historical.jsonl');
     await fs.writeFile(oldFile, [row(now - 2 * 86400000 - 3000, 'session_meta', { id: 'historical', cwd: '/project' }),
       row(now - 2 * 86400000 - 2000, 'event_msg', { type: 'user_message' }),
@@ -103,6 +110,7 @@ export async function run(): Promise<void> {
       const declared: string | { value: string; original: string } = extension.packageJSON.contributes.commands.find((item: { command: string }) => item.command === 'codexSpeed.showDetails').title;
       assert.equal(declared, commandTitle, '手动语言不改变 VS Code 原生清单标题');
       await waitFor(d => d.dashboardRender?.locale === (selected === 'auto' ? locale : selected));
+      await waitFor(d => Math.abs((d.dashboardRender?.costUSD ?? 0) - .00348) < .00000001);
     }
     now = Date.now();
     await fs.appendFile(file, row(now, 'token_usage_record', { response_id: 'two', usage: { output_tokens: 120 } }) + '\n' + row(now + 1, 'event_msg', { type: 'task_complete' }) + '\n');
@@ -130,7 +138,7 @@ export async function run(): Promise<void> {
     await vscode.workspace.getConfiguration('codexSpeed').update('language', 'auto', vscode.ConfigurationTarget.Global);
     await vscode.workspace.getConfiguration('codexSpeed').update('enabled', true, vscode.ConfigurationTarget.Global);
     await waitFor(d => d.state?.snapshot.output === 420 && d.dashboardRender?.locale === locale);
-    await fs.writeFile(report, JSON.stringify({ ok: true, locale: vscode.env.language, checks: ['真实宿主加载', 'workspace 远程部署声明', '日志发现与状态栏文字', '无窗口内输出时状态栏归零', '实测/估算/等待切换', '配置变更重启', '增量输出去重', '路径错误与恢复', '客户端语言及原生翻译加载', '悬浮摘要及错误提示翻译', '手动切换四种语言选项并保留用量', '错误提示随手动语言切换', 'Webview 实际脚本渲染与语言更新', '关闭并重开仪表盘', '停用监控后仍可切换面板语言', '默认今天和四种用量时间范围', '历史记录只在对应范围内累计'] }));
+    await fs.writeFile(report, JSON.stringify({ ok: true, locale: vscode.env.language, checks: ['真实宿主加载', 'workspace 远程部署声明', '日志发现与状态栏文字', '无窗口内输出时状态栏归零', '实测/估算/等待切换', '配置变更重启', '增量输出去重', '路径错误与恢复', '客户端语言及原生翻译加载', '悬浮摘要及错误提示翻译', '手动切换四种语言选项并保留用量', '错误提示随手动语言切换', 'Webview 实际脚本渲染与语言更新', '关闭并重开仪表盘', '停用监控后仍可切换面板语言', '默认今天和四种用量时间范围', '历史记录只在对应范围内累计', '三项 API 等值费用实际渲染', '修改单价即时重算并恢复', '语言切换保留费用'] }));
   } catch (error) {
     await fs.writeFile(report, JSON.stringify({ ok: false, error: error instanceof Error ? error.stack : String(error) }));
     throw error;

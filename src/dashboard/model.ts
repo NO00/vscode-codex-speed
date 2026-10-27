@@ -2,6 +2,10 @@ import path from 'node:path';
 import { calculateFrame, inWorkspace, measured, sampleDuration, SpeedPoint } from '../engine';
 import { MonitorOptions, Sample, Session, Snapshot } from '../types';
 import { HistoryStatus, UsageRange, UsageSummary } from '../history/types';
+import { defaultPrices } from '../cost/catalog';
+import { CostSummary, PriceBook } from '../cost/types';
+import { estimateCost } from '../cost/estimate';
+import { enrichUsage } from '../cost/usage';
 
 /** 单个会话的计数摘要，仅传递元数据，不传递对话正文。 */
 export interface SessionSummary {
@@ -43,6 +47,8 @@ export interface DashboardData {
   sessions: SessionSummary[];
   /** 可用记录的全局去重计数及加权平均速度。 */
   usage: { input: number; output: number; responses: number; average: number; peak: number; range: UsageRange; from: number; timeZone: string };
+  /** 已完成响应的 API 等值费用，与当前速度估算分开计算。 */
+  cost: CostSummary;
   /** 历史索引进度和完整性，与实时监控错误分开显示。 */
   history: HistoryStatus;
 }
@@ -50,7 +56,7 @@ export interface DashboardData {
 /** 从已有解析结果重建三百秒曲线，不另开日志扫描、模型请求或计时器。 */
 export class DashboardHistory {
   /** 只有面板可见时构造会话及用量，常规状态栏轮询不重复汇总。 */
-  data(sessions: Session[], options: MonitorOptions, snapshot: Snapshot, now: number, historical?: UsageSummary, status?: HistoryStatus): DashboardData {
+  data(sessions: Session[], options: MonitorOptions, snapshot: Snapshot, now: number, historical?: UsageSummary, status?: HistoryStatus, prices: PriceBook = defaultPrices): DashboardData {
     const frame = calculateFrame(sessions, options, now, true);
     const selected = sessions.filter(session => options.scope === 'all' || inWorkspace(session.cwd, options.workspaces));
     const grouped = new Map<string, Session[]>();
@@ -64,7 +70,8 @@ export class DashboardHistory {
         if (sample.end < now - 1800000 || sample.end > now) continue;
         for (const map of [own, unique]) {
           const old = map.get(sample.key);
-          if (!old || !measured(old) && measured(sample)) map.set(sample.key, sample);
+          if (!old) map.set(sample.key, sample);
+          else map.set(sample.key, !measured(old) && measured(sample) ? enrichUsage(sample, old) : enrichUsage(old, sample));
         }
       }
       const active = current.lastEvent >= now - 300000 && current.lastEvent <= now;
@@ -87,6 +94,7 @@ export class DashboardHistory {
       usage: { input: historical?.input ?? samples.reduce((sum, sample) => sum + sample.input, 0), output: historical?.output ?? samples.reduce((sum, sample) => sum + sample.output, 0),
         responses: historical?.responses ?? samples.length, average: historical?.average ?? (duration ? timed.reduce((sum, sample) => sum + sample.output, 0) * 1000 / duration : 0),
         peak, range: historical?.range ?? '30m', from: historical?.from ?? now - 1800000, timeZone: historical?.timeZone ?? 'UTC' },
+      cost: historical?.cost ?? estimateCost(samples, prices),
       history: status ?? { indexing: false, scanned: 0, total: 0, limited: false, readErrors: 0, cacheError: false, cacheReset: false, follower: false } };
   }
 }

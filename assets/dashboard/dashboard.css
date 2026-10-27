@@ -157,6 +157,34 @@ footer { display: flex; justify-content: space-between; align-items: flex-start;
 footer > p { max-width: 720px; }
 #privacy-note { white-space: nowrap; }
 
+/* 费用与速度估算分离；模型明细在窄面板内自然换行，不横向挤出页面。 */
+.cost-panel { border: 1px solid var(--border); border-radius: 7px; padding: 18px; }
+.cost-overview { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin: 17px 0; }
+#cost-state { display: block; }
+#cost-total { display: inline-block; color: var(--estimate); font: 600 34px var(--mono); margin: 5px 8px 0 0; }
+.cost-meta { display: flex; flex-direction: column; text-align: right; }
+.cost-parts, .cost-model-parts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.cost-parts { padding: 13px 0 16px; border-top: 1px solid var(--border); }
+.cost-parts > div > span { display: block; font-size: 11px; color: var(--muted); }
+.cost-parts strong { display: block; font: 16px var(--mono); padding-top: 5px; }
+.cost-model { padding: 13px 0; border-top: 1px solid var(--border); }
+.cost-model-heading { display: flex; justify-content: space-between; gap: 12px; font: 12px var(--mono); }
+.cost-model-heading > :first-child { overflow-wrap: anywhere; min-width: 0; }
+.cost-model-heading > :last-child { flex-shrink: 0; }
+.cost-model-parts { margin-top: 8px; }
+.cost-model-parts > span > span { display: block; }
+.cost-model-parts > span > :nth-child(2) { font: 12px var(--mono); margin: 2px 0; }
+.cost-empty { padding: 12px 0; }
+#cost-warning { margin-bottom: 8px; }
+.text-button { color: var(--accent); background: transparent; border: 0; padding: 7px 0 0; font-size: 11px; }
+@media (max-width: 400px) {
+  .cost-panel { padding: 14px; }
+  .cost-overview { align-items: flex-start; flex-direction: column; gap: 7px; }
+  .cost-meta { text-align: left; }
+  #cost-total { font-size: 29px; }
+  .cost-parts, .cost-model-parts { gap: 7px; }
+  .cost-parts strong { font-size: 13px; }
+}
 @media (max-width: 740px) {
   .dashboard { padding: 21px 22px 18px; }
   .overview { grid-template-columns: 1fr; }

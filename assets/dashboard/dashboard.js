@@ -20,6 +20,52 @@
   function number(value, compact = false) {
     return new Intl.NumberFormat(latest.locale, { notation: compact ? 'compact' : 'standard', maximumFractionDigits: compact ? 1 : 0 }).format(value);
   }
+  /** 微小正金额仍明确显示，未知且没有已计价部分时显示占位符。 */
+  function dollars(value, known = true) {
+    if (!known) return '—';
+    if (value > 0 && value < .0001) return '<$0.0001';
+    return new Intl.NumberFormat(latest.locale, { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol', minimumFractionDigits: 2, maximumFractionDigits: value < 1 ? 4 : 2 }).format(value);
+  }
+  /** 模型及费用明细只用纯文本 DOM；保留部分估算和未计价的区别。 */
+  function drawCosts() {
+    const { data, labels } = latest, cost = data.cost;
+    const complete = cost.complete === cost.responses;
+    text('cost-state', complete ? labels.estimatedTotal : labels.knownSubtotal);
+    text('cost-total', dollars(cost.usd, cost.usd > 0 || complete));
+    text('cost-coverage', `${labels.pricedResponses}: ${number(cost.complete)} / ${number(cost.responses)}`);
+    text('cost-price-date', `${labels.priceSnapshot}: ${cost.priceDate}`);
+    text('cost-period', labels[{ '30m': 'last30m', today: 'today', '7d': 'last7d', '30d': 'last30d' }[data.usage.range]]);
+    for (const key of ['ordinary', 'cached', 'output']) {
+      const part = cost[key]; text(`cost-${key}`, dollars(part.usd, part.pricedTokens > 0 || complete));
+      document.getElementById(`cost-${key}`).title = `${number(part.pricedTokens)} / ${number(part.tokens)} tokens`;
+    }
+    const container = document.getElementById('cost-models'); container.replaceChildren();
+    if (!cost.models.length) { const empty = document.createElement('p'); empty.className = 'small muted cost-empty'; empty.textContent = labels.costEmpty; container.append(empty); }
+    for (const row of cost.models) {
+      const item = document.createElement('div'); item.className = 'cost-model';
+      const heading = document.createElement('div'); heading.className = 'cost-model-heading';
+      const model = document.createElement('strong'); model.textContent = row.model || labels.unknownModel;
+      const amount = document.createElement('strong'); amount.textContent = row.source === 'unknown' ? labels.unpriced : dollars(row.usd, row.usd > 0 || row.complete === row.responses);
+      const source = document.createElement('span'); source.className = 'small muted';
+      source.textContent = `${row.source === 'custom' ? labels.customPrice : row.source === 'builtin' ? labels.standardPrice : labels.unpriced} · ${number(row.complete)}/${number(row.responses)} ${labels.requestUnit}`;
+      if (row.longContextResponses) source.textContent += ` · ${labels.longContextPrice}: ${number(row.longContextResponses)}`;
+      heading.append(model, amount); item.append(heading, source);
+      const parts = document.createElement('div'); parts.className = 'cost-model-parts';
+      for (const [key, label] of [['ordinary', 'ordinaryInput'], ['cached', 'cachedInput'], ['output', 'output']]) {
+        const part = row[key], detail = document.createElement('span');
+        const name = document.createElement('span'); name.className = 'small muted'; name.textContent = labels[label];
+        const value = document.createElement('span'); value.textContent = dollars(part.usd, row.source !== 'unknown' && (part.pricedTokens > 0 || row.complete === row.responses));
+        const count = document.createElement('span'); count.className = 'small muted'; count.textContent = `${number(part.tokens, true)} tokens`;
+        const rate = row.price?.[key === 'ordinary' ? 'input' : key === 'cached' ? 'cachedInput' : 'output'];
+        detail.title = `${number(part.pricedTokens)} / ${number(part.tokens)} tokens${rate !== undefined ? ` · ${rate} ${labels.priceUnit}` : ''}`;
+        detail.append(name, value, count); parts.append(detail);
+      }
+      item.append(parts); container.append(item);
+    }
+    const warnings = [!complete ? labels.costPartial : '', cost.unknownInput ? `${labels.unknownInput}: ${number(cost.unknownInput)}` : '',
+      cost.missingInput ? `${labels.missingInput}: ${number(cost.missingInput)}` : '', cost.cacheWrites ? `${labels.cacheWrites}: ${number(cost.cacheWrites)}` : ''].filter(Boolean);
+    text('cost-warning', warnings.join(' · ')); document.getElementById('cost-warning').hidden = !warnings.length;
+  }
   /** 绘制重建后的一秒桶：蓝线是实测部分，蓝绿虚线是含估算的合计。 */
   function drawChart() {
     const { data, labels } = latest;
@@ -165,14 +211,16 @@
     text('last-note', hasLast ? `${labels.lastNote}: ${(last.output * 1000 / Math.max(500, last.end - last.start)).toFixed(1)} tok/s · ${new Date(last.end).toLocaleTimeString(payload.locale, { hour12: false })}` : '');
     document.getElementById('last-note').hidden = !hasLast || !context.enabled || context.error;
     document.getElementById('language').value = payload.selectedLanguage;
-    drawChart(); drawSessions();
+    for (const [id, key] of [['cost-title', 'apiCost'], ['cost-ordinary-label', 'ordinaryInput'], ['cost-cached-label', 'cachedInput'], ['cost-output-label', 'output'], ['cost-note', 'costNote'], ['cost-settings', 'configurePrices']]) text(id, labels[key]);
+    drawChart(); drawSessions(); drawCosts();
     // 只用于宿主确认脚本收到并绘制了真实数据，不回传路径、模型或会话内容。
-    api.postMessage({ type: 'rendered', locale: payload.locale, sessions: data.sessions.length, usageRange: data.usage.range, output: data.usage.output, estimatedBuckets: data.points.filter(point => point.estimated > .000001).length, measuredBuckets: data.points.filter(point => point.measured > .000001).length });
+    api.postMessage({ type: 'rendered', locale: payload.locale, sessions: data.sessions.length, usageRange: data.usage.range, output: data.usage.output, costUSD: data.cost.usd, pricedResponses: data.cost.complete, estimatedBuckets: data.points.filter(point => point.estimated > .000001).length, measuredBuckets: data.points.filter(point => point.measured > .000001).length });
   }
   for (const button of document.querySelectorAll('[data-range]')) button.addEventListener('click', () => {
     range = Number(button.dataset.range); api.setState({ range }); if (latest) drawChart();
   });
   for (const type of ['refresh', 'settings']) document.getElementById(type).addEventListener('click', () => api.postMessage({ type }));
+  document.getElementById('cost-settings').addEventListener('click', () => api.postMessage({ type: 'prices' }));
   document.getElementById('language').addEventListener('change', event => api.postMessage({ type: 'language', value: event.target.value }));
   document.getElementById('usage-range').addEventListener('change', event => api.postMessage({ type: 'usageRange', value: event.target.value }));
   window.addEventListener('message', event => { if (event.data?.type === 'update') render(event.data.payload); });

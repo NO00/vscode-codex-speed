@@ -11,8 +11,14 @@ export interface Sample {
   end: number;
   /** 输出 token，已包含 reasoning，不能再次加上 reasoning。 */
   output: number;
-  /** 输入 token，仅用于详情。 */
+  /** 输入 token 总数，包含缓存命中；缺失时保留零并用 inputKnown 标识。 */
   input: number;
+  /** 来源确实提供了有效输入计数，旧缓存缺失时不能假定已知。 */
+  inputKnown?: boolean;
+  /** 缓存命中的输入 token；缺失与明确为零必须区分。 */
+  cachedInput?: number;
+  /** 来源单独报告的缓存写入 token，本版本不计入三项费用。 */
+  cacheWriteInput?: number;
   /** 调用对应的模型名。 */
   model: string;
 }

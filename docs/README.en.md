@@ -10,7 +10,7 @@ The extension runs as a `workspace` extension. In a remote window, it reads Code
 
 > This is an independent extension, not an official OpenAI extension or part of Agent Speed.
 
-## Monitoring console (0.1.8)
+## Monitoring console (0.1.10)
 
 Hover over the status item for a compact summary. Click it, or run **Codex Speed: Open Dashboard**, to open the dashboard beside your editor. It includes a digital speed readout, measured/estimated state, 1/2/5-minute charts, session/model/phase summaries, and usage statistics for the last 30 minutes, today, the last 7 days or the last 30 days. Today is the default and follows the dashboard client’s time zone; 7/30-day windows are rolling 7/30 × 24 hours. The toolbar contains language selection, rescan and Settings. Connection metadata, including the client time zone, is available in an expandable details section.
 
@@ -22,9 +22,27 @@ Core Codex speed rules follow Agent Speed: intervals use a 500 ms minimum and ex
 
 Input counts may include cached tokens. Average speed is weighted by completed request duration and excludes responses with unknown duration. The five-minute peak can include estimates. Usage history is indexed incrementally from the beginning of uncompressed JSONL files under `sessions` modified within the last 30 days, then cached in extension storage. Cursor and counters are saved together; restarts resume from committed line boundaries. Existing Codex logs remain read-only. Counts already cached from deleted logs remain until the 30-day retention window expires; a damaged cache can only be rebuilt from logs that still exist.
 
-Initial indexing, read failures and resource limits are explicitly marked as potentially incomplete. Background indexing uses the existing monitoring cycle with a byte budget; disabling monitoring pauses it and releases the cache writer lock. Cost estimates and network traffic tracking are not included.
+Initial indexing, read failures and resource limits are explicitly marked as potentially incomplete. Background indexing uses the existing monitoring cycle with a byte budget; disabling monitoring pauses it and releases the cache writer lock. Network traffic tracking is not included.
 
 Select the period in the usage card, or set `codexSpeed.usageRange` to `today` (default), `30m`, `7d` or `30d` in User or Remote settings. Changing the usage period does not clear the speed chart.
+
+## API-equivalent cost
+
+The dashboard shows USD totals, uncached input, cached input and output costs, with a per-model breakdown for the selected usage period and workspace scope. Completed usage is priced using the displayed offline snapshot, rather than the price that applied on each historical date. This is an API equivalent, not your Codex subscription bill. Prices were verified against [official OpenAI pricing](https://developers.openai.com/api/docs/pricing) on 2026-10-27. Known long-context multipliers apply per request.
+
+Uncached input subtracts cache hits and separately reported cache writes from total input. Reasoning is already included in output. Unknown models remain **Unpriced**; missing input or cache details produce a **Known subtotal** with coverage information. Separately logged cache writes, tool charges, service tiers (Fast/Flex/Batch, etc.) and regional premiums are excluded. In-flight speed estimates never create usage charges.
+
+Older caches are enriched incrementally from available logs without discarding existing counts. Deleted logs cannot supply missing metadata; their counts remain but may be unpriced. Raw counts, not monetary totals, are cached so price changes reprice retained usage immediately.
+
+Set `codexSpeed.priceOverrides` in User or Remote JSON settings. Each exact model ID requires `input`, `cachedInput` and `output` in **USD per million tokens**. Zero prices are valid. Built-in models inherit their known long-context rule unless an explicit `longContext` rule overrides it; unknown models have no inferred surcharge. No API key or extra network call is required.
+
+```json
+{
+  "codexSpeed.priceOverrides": {
+    "gpt-6.1-sol": { "input": 2, "cachedInput": 0.1, "output": 10 }
+  }
+}
+```
 
 ## Interface language
 
@@ -37,7 +55,7 @@ Command Palette titles and Settings descriptions always follow the VS Code displ
 ## Install in a Remote SSH window
 
 1. Connect to your server using **Remote - SSH** and open a remote folder.
-2. Open the Command Palette and run **Extensions: Install from VSIX...**. Select `vscode-codex-speed-0.1.9.vsix`.
+2. Open the Command Palette and run **Extensions: Install from VSIX...**. Select `vscode-codex-speed-0.1.10.vsix`.
 3. Confirm that **VSCode Codex Speed** appears under **SSH: your-server — Installed** in the Extensions view. If it is installed only locally, select **Install in SSH: your-server**. Run **Developer: Reload Window** if needed.
 4. Run Codex on the server as the same user. The status bar will show `Codex … tok/s`. New sessions are normally discovered within about five seconds, and existing logs are polled every second by default. Click the item to open the dashboard, whose toolbar offers rescanning and Settings.
 
@@ -100,6 +118,7 @@ If an end event is missing, a session can retain its generation estimate until f
 | `codexSpeed.pollIntervalMs` | `500` | Incremental reads and display refresh interval, from 500 to 10000 ms |
 | `codexSpeed.scanDays` | `3` | Include recently modified logs from the last 1–30 days; resumed sessions in older date folders can also be discovered |
 | `codexSpeed.showEstimates` | `true` | Show generation estimates marked with `~` |
+| `codexSpeed.priceOverrides` | `{}` | Per-model uncached input, cached input and output USD prices per million tokens; reprices immediately |
 
 The Command Palette provides these commands:
 
@@ -142,7 +161,7 @@ If no executable path is supplied, `@vscode/test-electron` downloads a separate 
 
 For a Windows installation using version subdirectories, an updater lock may prevent a new instance from starting. Use `bash scripts/host-test.sh --copy-installed "/path/to/VS Code"` to create an isolated copy under `.vscode-test/isolated-installed`. Only that copy's product metadata is adjusted to disable Windows installer update coordination; the original installation remains read-only. This tests the installed version, not necessarily the minimum supported version.
 
-The package is generated at `artifacts/vscode-codex-speed-0.1.9.vsix`. Starting with 0.1.2, `docs/MARKETPLACE.md` supplies the bilingual user-facing Marketplace overview, and `assets/icon.png` supplies the extension's own icon. Version 0.1.3 includes manifest and runtime translations. The detailed Chinese/English README files remain in the repository. No Node.js dependency installation is required on the server. All VSIX paths use ASCII characters for upload compatibility. Architecture and validation documents remain in the source repository at `docs/设计说明.md` and `docs/验证记录.md`.
+The package is generated at `artifacts/vscode-codex-speed-0.1.10.vsix`. Starting with 0.1.2, `docs/MARKETPLACE.md` supplies the bilingual user-facing Marketplace overview, and `assets/icon.png` supplies the extension's own icon. Version 0.1.3 includes manifest and runtime translations. The detailed Chinese/English README files remain in the repository. No Node.js dependency installation is required on the server. All VSIX paths use ASCII characters for upload compatibility. Architecture and validation documents remain in the source repository at `docs/设计说明.md` and `docs/验证记录.md`.
 
 Run `bash scripts/check-package.sh` to inspect an existing package, optionally passing a VSIX path. Checks reject duplicate paths after lossy ASCII conversion, non-ASCII paths, incorrect publisher/version metadata, and missing entry points or user documentation.
 

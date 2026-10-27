@@ -17,7 +17,8 @@ function validate(cache: HistoryCache, home: string): void {
   for (const file of cache.files) {
     const relative = path.relative(path.join(home, 'sessions'), file.file);
     if (!relative || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative) || !file.file.endsWith('.jsonl')) throw new Error('INVALID_PATH');
-    if (!tokens(file.offset) || !tokens(file.size) || !numeric(file.mtime) || typeof file.identity !== 'string' || typeof file.anchor !== 'string' || typeof file.skipping !== 'boolean') throw new Error('INVALID_CURSOR');
+    if (!tokens(file.offset) || !tokens(file.size) || !numeric(file.mtime) || typeof file.identity !== 'string' || typeof file.anchor !== 'string' || typeof file.skipping !== 'boolean'
+      || file.costVersion !== undefined && file.costVersion !== 1) throw new Error('INVALID_CURSOR');
     const parser = file.parser;
     if (!parser || !['id', 'cwd', 'model'].every(key => typeof parser[key as 'id'] === 'string') || !['idle', 'tools', 'generating'].includes(parser.phase)
       || !numeric(parser.lastEvent) || [parser.pendingStart, parser.created].some(value => value !== undefined && !numeric(value))
@@ -25,7 +26,9 @@ function validate(cache: HistoryCache, home: string): void {
     if (!Array.isArray(file.records) || (count += file.records.length) > MAX_RECORDS) throw new Error('INVALID_RECORDS');
     for (const record of file.records) {
       if (!record || !['key', 'cwd', 'session', 'model'].every(key => typeof record[key as 'key'] === 'string') || !numeric(record.end)
-        || record.start !== undefined && !numeric(record.start) || !tokens(record.input) || !tokens(record.output)) throw new Error('INVALID_RECORD');
+        || record.start !== undefined && !numeric(record.start) || !tokens(record.input) || !tokens(record.output)
+        || record.inputKnown !== undefined && typeof record.inputKnown !== 'boolean'
+        || [record.cachedInput, record.cacheWriteInput].some(value => value !== undefined && !tokens(value))) throw new Error('INVALID_RECORD');
     }
   }
 }
