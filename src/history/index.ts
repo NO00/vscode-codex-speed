@@ -5,7 +5,7 @@ import { MonitorOptions, Session } from '../types';
 import { HistoryCacheStore, MAX_FILES, MAX_RECORDS } from './cache';
 import { emptyFile, readHistoryFile } from './reader';
 import { summarize } from './ranges';
-import { HistoryStatus, IndexedFile, UsageRange, UsageRecord, UsageSummary } from './types';
+import { HISTORY_ANALYSIS_VERSION, HistoryStatus, IndexedFile, UsageRange, UsageRecord, UsageSummary } from './types';
 import { defaultPrices } from '../cost/catalog';
 import { PriceBook } from '../cost/types';
 
@@ -62,11 +62,12 @@ export class UsageIndex {
   /** 当前完整性提示，不将初次回填当成完整的零用量。 */
   get status(): HistoryStatus {
     let scanned = 0;
-    for (const [file, target] of this.targets) { const state = this.files.get(file); if (state?.costVersion === 1 && state.offset >= target.size && state.mtime === target.mtime) scanned++; }
+    for (const [file, target] of this.targets) { const state = this.files.get(file); if (state?.costVersion === 1 && state.analysisVersion === HISTORY_ANALYSIS_VERSION && state.offset >= target.size && state.mtime === target.mtime) scanned++; }
     const follower = this.loaded && !this.cache.owner;
-    if (follower) scanned = [...this.files.values()].filter(file => file.costVersion === 1 && file.offset >= file.size).length;
+    if (follower) scanned = [...this.files.values()].filter(file => file.costVersion === 1 && file.analysisVersion === HISTORY_ANALYSIS_VERSION && file.offset >= file.size).length;
     return { indexing: !this.loaded || (follower ? !this.cache.complete : !!this.discovery || scanned < this.targets.size), scanned, total: follower ? this.files.size : this.targets.size,
-      limited: this.limited, readErrors: this.readErrors, cacheError: this.cache.error, cacheReset: this.cache.reset, follower: !this.cache.owner };
+      limited: this.limited, readErrors: this.readErrors, cacheError: this.cache.error, cacheReset: this.cache.reset, follower: !this.cache.owner,
+      unverifiedFiles: [...this.files.values()].filter(file => file.analysisVersion !== HISTORY_ANALYSIS_VERSION && file.records.length > 0).length };
   }
 
   /** 按响应 ID 合并实时尾部；首次索引尚未结束时也能显示已知的当前用量。 */
@@ -117,13 +118,14 @@ export class UsageIndex {
     for (let index = 0; index < targets.length; index++) {
       if (this.disposed || this.paused || budget <= 0 || visited >= 12) break;
       const [file, target] = targets[this.cursor++ % targets.length]!;
-      if (records >= MAX_RECORDS || this.files.size >= MAX_FILES && !this.files.has(file)) { this.limited = true; break; }
       let state = this.files.get(file);
-      if (state?.costVersion === 1 && state.offset >= target.size && state.mtime === target.mtime) continue;
+      // 旧文件重算会先释放自身计数容量；总记录达到上限也必须允许这些文件迁移。
+      if (records >= MAX_RECORDS && (!state || state.analysisVersion === HISTORY_ANALYSIS_VERSION) || this.files.size >= MAX_FILES && !state) { this.limited = true; continue; }
+      if (state?.costVersion === 1 && state.analysisVersion === HISTORY_ANALYSIS_VERSION && state.offset >= target.size && state.mtime === target.mtime) continue;
       visited++;
       if (!state) { state = emptyFile(file); this.files.set(file, state); }
       const before = state.records.length;
-      const cursor = `${state.offset}:${state.size}:${state.mtime}:${state.identity}:${state.costVersion}`;
+      const cursor = `${state.offset}:${state.size}:${state.mtime}:${state.identity}:${state.costVersion}:${state.analysisVersion}`;
       try {
         budget -= await readHistoryFile(state, budget, now - RETENTION, MAX_RECORDS - records);
         this.targets.set(file, { size: state.size, mtime: state.mtime });
@@ -133,7 +135,7 @@ export class UsageIndex {
         else this.readErrors++;
       }
       records += state.records.length - before; this.revision++;
-      if (before !== state.records.length || cursor !== `${state.offset}:${state.size}:${state.mtime}:${state.identity}:${state.costVersion}`) this.dirty = true;
+      if (before !== state.records.length || cursor !== `${state.offset}:${state.size}:${state.mtime}:${state.identity}:${state.costVersion}:${state.analysisVersion}`) this.dirty = true;
     }
     const complete = !this.status.indexing && !this.limited && !this.readErrors;
     if (complete !== this.cache.complete) this.dirty = true;

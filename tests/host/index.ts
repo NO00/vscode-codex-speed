@@ -55,7 +55,7 @@ export async function run(): Promise<void> {
       row(now - 5000, 'session_meta', { id: 'host-test', cwd: '/project' }),
       row(now - 4500, 'turn_context', { model: 'gpt-6.1-sol' }),
       row(now - 4000, 'event_msg', { type: 'task_started' }),
-      row(now - 1000, 'token_usage_record', { response_id: 'one', usage: { output_tokens: 300, input_tokens: 1000, cached_input_tokens: 800, cache_write_tokens: 0 } }),
+      row(now - 1000, 'token_usage_record', { response_id: 'one', usage: { output_tokens: 300, input_tokens: 1000, cached_input_tokens: 800, cache_write_input_tokens: 0 } }),
       row(now - 900, 'event_msg', { type: 'task_complete' })
     ].join('\n') + '\n');
     await vscode.commands.executeCommand('codexSpeed.refresh');
@@ -79,7 +79,7 @@ export async function run(): Promise<void> {
     await waitFor(d => Math.abs((d.dashboardRender?.costUSD ?? 0) - .00348) < .00000001);
     // 同一份虚拟日志缺少写入数时，前端应显示部分计价而非假定普通输入。
     const initialUsage = await fs.readFile(file, 'utf8');
-    await fs.writeFile(file, initialUsage.replace(',"cache_write_tokens":0', ''));
+    await fs.writeFile(file, initialUsage.replace(',"cache_write_input_tokens":0', ''));
     await vscode.commands.executeCommand('codexSpeed.refresh');
     await waitFor(d => d.dashboardRender?.pricedResponses === 0 && Math.abs((d.dashboardRender.costUSD ?? 0) - .00308) < .00000001);
     await fs.writeFile(file, initialUsage);
@@ -123,6 +123,25 @@ export async function run(): Promise<void> {
     now = Date.now();
     await fs.appendFile(file, row(now, 'token_usage_record', { response_id: 'two', usage: { output_tokens: 120 } }) + '\n' + row(now + 1, 'event_msg', { type: 'task_complete' }) + '\n');
     await waitFor(d => d.state?.snapshot.output === 420);
+    // 独立数据源验证新版分页子会话与邮箱计时，避免污染原有用量范围测试。
+    const compatibilityHome = path.join(home, 'compatibility'), compatibilityFile = path.join(compatibilityHome, 'sessions', 'child.jsonl');
+    await fs.mkdir(path.dirname(compatibilityFile), { recursive: true });
+    const compatibilityNow = Date.now();
+    const compatibilityRows = [
+      { timestamp: new Date(compatibilityNow - 6000).toISOString(), ordinal: 0, type: 'session_meta', payload: { id: 'compat-child', cwd: '/project', agent_path: '/root/worker', subagent_history_start_ordinal: 5 } },
+      { timestamp: new Date(compatibilityNow - 5500).toISOString(), ordinal: 1, type: 'token_usage_record', payload: { response_id: 'inherited', usage: { output_tokens: 999 } } },
+      { timestamp: new Date(compatibilityNow - 5000).toISOString(), ordinal: 5, type: 'turn_context', payload: { model: 'gpt-6.1-sol' } },
+      { timestamp: new Date(compatibilityNow - 4000).toISOString(), ordinal: 6, type: 'response_item', payload: { type: 'agent_message', recipient: '/root/worker' } },
+      { timestamp: new Date(compatibilityNow - 3000).toISOString(), ordinal: 7, type: 'response_item', payload: { type: 'reasoning' } },
+      { timestamp: new Date(compatibilityNow - 1000).toISOString(), ordinal: 8, type: 'token_usage_record', payload: { response_id: 'compat-own', usage: { input_tokens: 100, cached_input_tokens: 80, cache_write_input_tokens: 0, output_tokens: 60 } } },
+      { timestamp: new Date(compatibilityNow - 900).toISOString(), ordinal: 9, type: 'event_msg', payload: { type: 'task_complete' } }
+    ];
+    await fs.writeFile(compatibilityFile, compatibilityRows.map(item => JSON.stringify(item)).join('\n') + '\n');
+    await vscode.workspace.getConfiguration('codexSpeed').update('codexHome', compatibilityHome, vscode.ConfigurationTarget.Global);
+    await waitFor(d => d.home === compatibilityHome && d.state?.snapshot.output === 60 && d.state.snapshot.latest?.start === compatibilityNow - 4000);
+    await waitFor(d => d.dashboardRender?.pricedResponses === 1 && Math.abs((d.dashboardRender.costUSD ?? 0) - .000648) < 1e-10);
+    await vscode.workspace.getConfiguration('codexSpeed').update('codexHome', home, vscode.ConfigurationTarget.Global);
+    await waitFor(d => d.home === home && d.state?.snapshot.output === 420);
     const empty = { snapshot: { rate: 0, measuredRate: 0, estimatedRate: 0, estimatedShare: 0, kind: 'idle' as const, active: 0, sessions: 0, responses: 0, output: 0, latest: undefined }, notice: '', error: true, limited: false };
     assert.match(statusText(empty), /warning/);
     await vscode.workspace.getConfiguration('codexSpeed').update('codexHome', path.join(home, 'missing'), vscode.ConfigurationTarget.Global);
@@ -146,7 +165,7 @@ export async function run(): Promise<void> {
     await vscode.workspace.getConfiguration('codexSpeed').update('language', 'auto', vscode.ConfigurationTarget.Global);
     await vscode.workspace.getConfiguration('codexSpeed').update('enabled', true, vscode.ConfigurationTarget.Global);
     await waitFor(d => d.state?.snapshot.output === 420 && d.dashboardRender?.locale === locale);
-    await fs.writeFile(report, JSON.stringify({ ok: true, locale: vscode.env.language, checks: ['真实宿主加载', 'workspace 远程部署声明', '日志发现与状态栏文字', '无窗口内输出时状态栏归零', '实测/估算/等待切换', '配置变更重启', '增量输出去重', '路径错误与恢复', '客户端语言及原生翻译加载', '悬浮摘要及错误提示翻译', '手动切换四种语言选项并保留用量', '错误提示随手动语言切换', 'Webview 实际脚本渲染与语言更新', '关闭并重开仪表盘', '停用监控后仍可切换面板语言', '默认今天和四种用量时间范围', '历史记录只在对应范围内累计', '三项 API 等值费用实际渲染', '修改单价即时重算并恢复', '语言切换保留费用'] }));
+    await fs.writeFile(report, JSON.stringify({ ok: true, locale: vscode.env.language, checks: ['真实宿主加载', 'workspace 远程部署声明', '日志发现与状态栏文字', '无窗口内输出时状态栏归零', '实测/估算/等待切换', '配置变更重启', '增量输出去重', '路径错误与恢复', '客户端语言及原生翻译加载', '悬浮摘要及错误提示翻译', '手动切换四种语言选项并保留用量', '错误提示随手动语言切换', 'Webview 实际脚本渲染与语言更新', '关闭并重开仪表盘', '停用监控后仍可切换面板语言', '默认今天和四种用量时间范围', '历史记录只在对应范围内累计', '三项 API 等值费用实际渲染', '修改单价即时重算并恢复', '语言切换保留费用', 'Codex 原生缓存写入零值', '分页子会话排除继承历史', '子 agent 邮箱请求计时'] }));
   } catch (error) {
     await fs.writeFile(report, JSON.stringify({ ok: false, error: error instanceof Error ? error.stack : String(error) }));
     throw error;

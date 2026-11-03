@@ -33,6 +33,7 @@ export function dashboardMessages(t: Translate): Record<string, string> {
     stale: t('Session activity expires after five minutes without new events.'),
     indexing: t('Indexing history'), indexedFiles: t('files processed'), incomplete: t('Totals may be incomplete.'),
     historyPartial: t('Some history could not be read or a resource limit was reached.'),
+    historyUnverified: t('Cached files need reanalysis. Unavailable source logs leave old totals that may include inherited history.'),
     cacheError: t('History cache is unavailable. Results are kept in memory for this session.'),
     cacheReset: t('The cache was rebuilt from available logs.'), timeZone: t('Time zone'),
     historyNote: t('History is retained for 30 days. Only uncompressed session JSONL files are indexed.'),

@@ -49,7 +49,9 @@ function payload(selectedLanguage, selectedRange = 'today', selectedZone = 'Asia
     ...[7200000, 2 * 86400000, 5 * 86400000, 12 * 86400000, 25 * 86400000].map((age, index) => ({ key: `${session.id}:old:${index}`, start: now - age - 10000, end: now - age,
       input: 50000, inputKnown: true, cachedInput: 40000, cacheWriteInput: 0, output: 3000, model: session.model, cwd: session.cwd, session: session.id }))]);
   const totals = summarize(records, usageRange(selectedRange), validTimeZone(selectedZone), options, now);
-  return { data: history.data(currentSessions, options, currentSnapshot, now, totals), labels: dashboardMessages(t), locale, selectedLanguage,
+  const data = history.data(currentSessions, options, currentSnapshot, now, totals);
+  if (scenario === 'unverified-history') data.history.unverifiedFiles = 1;
+  return { data, labels: dashboardMessages(t), locale, selectedLanguage,
     context: { host: 'ssh-remote / ubuntu', home: options.home, scope: 'all', notice: '', error: false, limited: false, enabled: true } };
 }
 const bridge = `(() => {

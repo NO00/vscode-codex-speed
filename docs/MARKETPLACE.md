@@ -34,6 +34,8 @@ Codex 0.0 tok/s          无当前输出 / No current output
 
 首次使用会分批索引历史，显示进度及不完整提示。缓存保存计数与读取断点，重启后继续增量读取；只支持 `sessions` 目录下近 30 天内更新的未压缩 JSONL。缓存文件保存在扩展存储目录，Codex 日志保持只读。
 
+支持新版分页子会话，排除继承的父历史，避免用量和费用重复；子 agent 邮箱计时与原生缓存写入计数也已兼容。升级后会分批重新核算历史；源日志已删除时保留旧统计，并提示尚未验证的缓存可能包含继承历史。
+
 监控台采用蓝色实测线和浅蓝绿色估算线：宽屏为并排趋势区、横向用量数据和会话表格，窄窗口转为紧凑卡片。顶部可选择语言、重新扫描或打开设置，连接信息在下方按需展开。关闭面板后仍按已有监控周期采样，未增加额外扫描计时器；不监测网络流量。
 
 ### API 等值费用
@@ -155,6 +157,8 @@ For a custom data directory, set `codexSpeed.codexHome` in VS Code **User or Rem
 The default host-wide scope includes other sessions, even when the chat you are viewing has stopped. Missing completion events can leave generation estimates active until five minutes after the latest log event.
 
 Historical usage is indexed in batches from uncompressed JSONL files under `sessions` modified within the last 30 days. Initial indexing and incomplete results are clearly marked. Counters and read cursors are cached in extension storage so indexing can resume after a restart; Codex logs remain read-only.
+
+Paginated Codex subagents exclude inherited parent history to prevent duplicate usage and cost. Addressed agent messages supply request timing, and native cache-write counters are supported. Upgrades progressively reanalyze available logs; deleted source logs retain old totals with an explicit warning that inherited history may remain.
 
 ### Useful settings
 

@@ -112,6 +112,7 @@
   "files processed": "個檔案已處理",
   "Totals may be incomplete.": "統計可能尚不完整。",
   "Some history could not be read or a resource limit was reached.": "部分歷史日誌無法讀取，或已達到資源上限。",
+  "Cached files need reanalysis. Unavailable source logs leave old totals that may include inherited history.": "舊快取尚待重新核算；來源日誌不可用時保留的舊統計可能包含繼承歷史。",
   "History cache is unavailable. Results are kept in memory for this session.": "歷史快取無法使用，目前結果僅保留在本次工作階段內。",
   "The cache was rebuilt from available logs.": "快取已從可用日誌重新建立。",
   "Time zone": "時區",

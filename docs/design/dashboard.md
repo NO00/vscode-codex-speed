@@ -44,6 +44,10 @@ Webview 无网络访问权限，脚本和样式仅从打包资源加载，脚本
 
 ## 参考口径与范围
 
+0.1.11 另按 [Agent Speed 1.6.1 的 Codex 解析规则](https://github.com/zoefix/agent-speed/blob/384ce020cc655133e95aaad5cc085f3985f0ed99/spec/METRICS.md#35-copied-history)兼容分页子会话：按原始 JSON 的有效 64 位序号过滤继承历史，不依赖行号或被重写的时间戳；过滤发生在任何模型、目录、阶段与计数变化前。邮箱仅校准发给当前 agent 的消息起点，不唤醒阶段，不覆盖流式请求。解析检查点保存规范化十进制序号及 agent 地址，大文件头部元数据种子沿用同一规则。
+
+历史解析版本从隐式旧规则升级至 `analysisVersion: 2`，可读源文件按预算重新计算而非仅按 key 补齐，以便删除曾误计的父历史；已删除的源文件继续保留旧记录并显示未验证提示。旧版费用元数据的增量补齐仍独立保留。核心三秒窗口公式和原十一组引擎案例不变，新公开样例位于 `tests/fixtures/codex`，保留上游固定提交及 MIT 许可。
+
 参考 [Agent Speed 测速规范 6.2／6.3／6.5](https://github.com/zoefix/agent-speed/blob/a94a67fcc78e5d8eea5f82d8d5e737bccf994e2c/spec/METRICS.md#6-engine)。`tests/fixtures/agent-speed-engine.json` 保留原版全部来源为 Codex、响应为最终记录的十一组案例及完整 MIT 许可，测试仅比对本扩展支持的输出速度、估算占比与存在的历史期望。分桶另与独立逐区间公式交叉核对。
 
 这不是整个 Agent Speed 的移植：不提供它的其他 agent 来源、压缩与归档日志、网络流量、总输入吞吐或每日峰值存储。0.1.10 起另有按模型拆分的 API 等值费用，计算规则见 [费用设计](pricing.md)。日志发现、有界读取、作用域和当前保留上限也会影响两个工具读取到的数据集，不能保证两者在不同主机、不同范围下显示完全相同的数字。

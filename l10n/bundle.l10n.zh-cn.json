@@ -112,6 +112,7 @@
   "files processed": "个文件已处理",
   "Totals may be incomplete.": "统计可能尚不完整。",
   "Some history could not be read or a resource limit was reached.": "部分历史日志无法读取，或已达到资源上限。",
+  "Cached files need reanalysis. Unavailable source logs leave old totals that may include inherited history.": "旧缓存尚待重新核算；源日志不可用时保留的旧统计可能包含继承历史。",
   "History cache is unavailable. Results are kept in memory for this session.": "历史缓存不可用，当前结果仅保留在本次会话内。",
   "The cache was rebuilt from available logs.": "缓存已从可用日志重新建立。",
   "Time zone": "时区",

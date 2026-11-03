@@ -189,7 +189,7 @@
     text('stale-note', `${labels.stale} ${labels.sessionPeriod}`);
     const history = data.history;
     const indexing = history.indexing ? `${context.enabled ? labels.indexing : labels.incomplete} · ${number(history.scanned)} / ${number(history.total)} ${labels.indexedFiles}. ${labels.incomplete}` : '';
-    const warnings = [indexing, history.limited || history.readErrors ? `${labels.historyPartial} ${labels.incomplete}` : '', history.cacheError ? labels.cacheError : '', history.cacheReset ? labels.cacheReset : ''].filter(Boolean);
+    const warnings = [indexing, history.limited || history.readErrors ? `${labels.historyPartial} ${labels.incomplete}` : '', history.unverifiedFiles ? `${labels.historyUnverified} (${number(history.unverifiedFiles)})` : '', history.cacheError ? labels.cacheError : '', history.cacheReset ? labels.cacheReset : ''].filter(Boolean);
     text('history-status', warnings.join(' ')); document.getElementById('history-status').hidden = !warnings.length;
     for (const id of ['refresh', 'settings']) { document.getElementById(id).title = labels[id]; document.getElementById(id).setAttribute('aria-label', labels[id]); }
     const phase = context.error ? 'error' : snapshot.kind;

@@ -5,6 +5,9 @@ import { CostSummary } from '../cost/types';
 /** 用量时间范围，今天以仪表盘所在客户端的 IANA 时区划分。 */
 export type UsageRange = '30m' | 'today' | '7d' | '30d';
 
+/** 解析规则版本独立于缓存容器格式，升级后必须重算可读来源，删除不再有效的旧响应。 */
+export const HISTORY_ANALYSIS_VERSION = 2;
+
 /** 可持久化的响应计数及计价模型，不存储模型输出或原始行。 */
 export interface UsageRecord extends Sample {
   /** 响应发生时的目录，用于切换工作区范围。 */
@@ -25,6 +28,8 @@ export interface IndexedFile {
   anchor: string;
   /** 费用元数据版本；旧缓存需从原日志增量回填，但保留已有计数。 */
   costVersion?: 1;
+  /** 分页过滤、邮箱计时及原生用量字段的解析版本；缺失表示旧解析规则。 */
+  analysisVersion?: 2;
   /** 最后一条完整事件后的解析状态。 */
   parser: ParserCheckpoint;
   /** 近三十天的已解析用量。 */
@@ -59,6 +64,8 @@ export interface HistoryStatus {
   cacheReset: boolean;
   /** 其他窗口负责写入，本窗口只读取已提交缓存。 */
   follower: boolean;
+  /** 尚未按当前规则重算且仍保留旧记录的文件数，来源删除时不能静默当成已验证。 */
+  unverifiedFiles?: number;
 }
 
 /** 查询后的总量以及供当前列表使用的会话计数。 */
