@@ -21,6 +21,7 @@ Codex 0.0 tok/s          无当前输出 / No current output
 - 汇总多个会话和子 agent，也可以只查看当前工作区中的会话。
 - 点击状态栏打开仪表盘：数字读数、1／2／5 分钟曲线、会话列表及可切换范围的用量。
 - 按模型估算 API 等值美元费用，拆分普通输入、缓存输入与输出，支持自定义单价。
+- 查看订阅额度已用比例、重置时间与剩余时间，区分首段内容等待和最近已观测调用，并按模型汇总当前速度。
 
 这是独立的社区扩展，不属于 OpenAI 官方产品。界面默认跟随 VS Code 显示语言，支持英文、简体中文和繁体中文；其他语言使用英文。
 
@@ -37,6 +38,14 @@ Codex 0.0 tok/s          无当前输出 / No current output
 支持新版分页子会话，排除继承的父历史，避免用量和费用重复；子 agent 邮箱计时与原生缓存写入计数也已兼容。升级后会分批重新核算历史；源日志已删除时保留旧统计，并提示尚未验证的缓存可能包含继承历史。
 
 监控台采用蓝色实测线和浅蓝绿色估算线：宽屏为并排趋势区、横向用量数据和会话表格，窄窗口转为紧凑卡片。顶部可选择语言、重新扫描或打开设置，连接信息在下方按需展开。关闭面板后仍按已有监控周期采样，未增加额外扫描计时器；不监测网络流量。
+
+### 运行概况
+
+订阅额度直接读取 Codex 日志中的账户快照，显示实际提供的 5 小时、每周或其他周期、已用比例、重置日期和剩余时间。它覆盖当前 Codex 数据目录的全部工作区，不累加不同会话的百分比，也不随用量日期范围改变。没有记录时显示暂无额度；旧于一小时会标记旧快照。重置时间已到时等待新日志确认，不假定用量已经归零；点击重新扫描只会读日志，不请求额度 API。
+
+“首段内容等待”指请求起点到首个思考、助手消息或工具调用事件写入日志的时间，并非精确的首 token 延迟。等待中显示当前最久请求的已等待时长（`≥`）；活跃请求已有首段时显示已观测均值，空闲时显示最近半小时中最近一次可确认的调用。缺少起点或首段事件时显示暂无数据。
+
+按模型汇总与主读数共用最近三秒窗口，区分实测和估算。模型切换后，上一条完成调用仍归属它实际记录的模型，新的在途估算归属当前模型；模型汇总不会改变费用计价。
 
 ### API 等值费用
 
@@ -109,6 +118,7 @@ Codex 0.0 tok/s          无当前输出 / No current output
 - Combined readings for multiple sessions and subagents, or a view limited to your workspace folders.
 - A dashboard with a digital speed readout, 1/2/5-minute charts, session summaries and selectable usage periods.
 - API-equivalent USD estimates by model, separating uncached input, cached input and output, with configurable prices.
+- Subscription quota usage, reset dates and time remaining, first-content wait states, and live speed grouped by model.
 
 This is an independent community extension, not an official OpenAI product. The UI follows the VS Code display language by default. English, Simplified Chinese and Traditional Chinese are supported; other languages fall back to English.
 
@@ -121,6 +131,14 @@ Hover for a compact summary, or click to open the dashboard. Core Codex speed fo
 Usage supports the last 30 minutes, today, the last 7 days and the last 30 days. Today follows the client time zone; 7/30-day periods use rolling hours. Input may include cached tokens; averages use timed completed calls. The five-minute monitored peak can include estimates and is corrected with reconstructed history.
 
 The console uses blue measured lines and teal estimate lines. Wide windows show the reading beside its trend, a horizontal usage strip and a session table; narrow windows use compact cards. Language, rescan and Settings are in the toolbar, with connection metadata in expandable details. Closing the dashboard keeps the existing status-bar sampling active, without another scanning timer. Network traffic tracking is not included.
+
+### Runtime insights
+
+Subscription quota comes directly from `rate_limits` snapshots in Codex logs. The dashboard shows the reported 5-hour, weekly or other windows, percentage used, reset date and time remaining. This is account-level data for the current Codex Home across all workspaces; percentages are not added across sessions or filtered by the usage period. Missing records remain unavailable, snapshots older than one hour are labeled, and a passed reset time waits for new logs instead of assuming usage is zero. Rescan only rereads logs; no quota API or credentials are used.
+
+First-content wait measures request start to the first reasoning, assistant or tool-call event written to the log, rather than exact first-token arrival. While waiting, `≥` shows elapsed time for the longest waiting request. Active observed requests show their mean wait; when none are generating, the most recent available observed call within thirty minutes is shown. Missing timing remains unavailable.
+
+Speed by model uses the same three-second window as the main reading. Completed calls retain their recorded model when the session switches models; in-flight estimates use the current model. This breakdown does not change cost pricing.
 
 ### API-equivalent cost
 

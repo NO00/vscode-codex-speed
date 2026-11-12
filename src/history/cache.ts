@@ -23,14 +23,14 @@ function validate(cache: HistoryCache, home: string): void {
       || file.analysisVersion !== undefined && file.analysisVersion !== HISTORY_ANALYSIS_VERSION) throw new Error('INVALID_CURSOR');
     const parser = file.parser;
     if (!parser || !['id', 'cwd', 'model'].every(key => typeof parser[key as 'id'] === 'string') || !['idle', 'tools', 'generating'].includes(parser.phase)
-      || !numeric(parser.lastEvent) || [parser.pendingStart, parser.created].some(value => value !== undefined && !numeric(value))
+      || !numeric(parser.lastEvent) || [parser.pendingStart, parser.created, parser.firstContent].some(value => value !== undefined && !numeric(value))
       || typeof parser.modern !== 'boolean' || typeof parser.streaming !== 'boolean' || parser.previous && !Object.values(parser.previous).every(tokens)
       || parser.agentPath !== undefined && typeof parser.agentPath !== 'string'
       || parser.subagentStartOrdinal !== undefined && !validOrdinal(parser.subagentStartOrdinal)) throw new Error('INVALID_PARSER');
     if (!Array.isArray(file.records) || (count += file.records.length) > MAX_RECORDS) throw new Error('INVALID_RECORDS');
     for (const record of file.records) {
       if (!record || !['key', 'cwd', 'session', 'model'].every(key => typeof record[key as 'key'] === 'string') || !numeric(record.end)
-        || record.start !== undefined && !numeric(record.start) || !tokens(record.input) || !tokens(record.output)
+        || [record.start, record.firstContent].some(value => value !== undefined && !numeric(value)) || !tokens(record.input) || !tokens(record.output)
         || record.inputKnown !== undefined && typeof record.inputKnown !== 'boolean'
         || [record.cachedInput, record.cacheWriteInput].some(value => value !== undefined && !tokens(value))) throw new Error('INVALID_RECORD');
     }

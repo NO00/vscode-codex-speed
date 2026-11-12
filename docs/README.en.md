@@ -10,7 +10,7 @@ The extension runs as a `workspace` extension. In a remote window, it reads Code
 
 > This is an independent extension, not an official OpenAI extension or part of Agent Speed.
 
-## Monitoring console (0.1.11)
+## Monitoring console (0.1.12)
 
 Hover over the status item for a compact summary. Click it, or run **Codex Speed: Open Dashboard**, to open the dashboard beside your editor. It includes a digital speed readout, measured/estimated state, 1/2/5-minute charts, session/model/phase summaries, and usage statistics for the last 30 minutes, today, the last 7 days or the last 30 days. Today is the default and follows the dashboard client’s time zone; 7/30-day windows are rolling 7/30 × 24 hours. The toolbar contains language selection, rescan and Settings. Connection metadata, including the client time zone, is available in an expandable details section.
 
@@ -27,6 +27,16 @@ Initial indexing, read failures and resource limits are explicitly marked as pot
 Version 0.1.11 skips inherited parent history in paginated Codex subagents, preventing duplicated usage and cost. Addressed agent messages establish request timing, and native cache-write counters are recognized alongside API detail fields. Available logs are reanalyzed incrementally after upgrade, removing inherited responses from older caches. When a source log is unavailable, its old totals remain with an explicit warning that inherited history may still be included.
 
 Select the period in the usage card, or set `codexSpeed.usageRange` to `today` (default), `30m`, `7d` or `30d` in User or Remote settings. Changing the usage period does not clear the speed chart.
+
+## Runtime insights
+
+Version 0.1.12 adds subscription quotas, first-content wait, and live speed grouped by model. These features reuse existing log reads and refreshes without API calls or credential access.
+
+Quota data comes from the newest usable `token_count.payload.rate_limits` snapshot across the current Codex Home, independently of workspace scope or usage period. Available windows show percent used, reset dates and time remaining. Snapshots older than an hour are labeled; passed reset times wait for new logs instead of assuming zero usage. Logs without quota fields show an unavailable state. Different sessions' percentages are never added.
+
+First-content wait is request start to the first reasoning, assistant or tool-call event written to the log, including possible logging delay. It is not exact first-token arrival. Pending requests show the longest elapsed wait (`≥`); active observed requests show their mean; when none are generating, the most recent observed call within thirty minutes is shown. Missing timing remains unavailable.
+
+Model speeds sum to the main three-second reading, including the same measured and estimated components. Completed calls retain their recorded model; in-flight estimates use the current context model. Model switches, mirrors, workspace scope and disabling estimates retain existing measurement rules. See the [design notes](design/insights.md) for detailed semantics.
 
 ## API-equivalent cost
 
@@ -59,7 +69,7 @@ Command Palette titles and Settings descriptions always follow the VS Code displ
 ## Install in a Remote SSH window
 
 1. Connect to your server using **Remote - SSH** and open a remote folder.
-2. Open the Command Palette and run **Extensions: Install from VSIX...**. Select `vscode-codex-speed-0.1.11.vsix`.
+2. Open the Command Palette and run **Extensions: Install from VSIX...**. Select `vscode-codex-speed-0.1.12.vsix`.
 3. Confirm that **VSCode Codex Speed** appears under **SSH: your-server — Installed** in the Extensions view. If it is installed only locally, select **Install in SSH: your-server**. Run **Developer: Reload Window** if needed.
 4. Run Codex on the server as the same user. The status bar will show `Codex … tok/s`. New sessions are normally discovered within about five seconds, and existing logs are polled every second by default. Click the item to open the dashboard, whose toolbar offers rescanning and Settings.
 
@@ -165,7 +175,7 @@ If no executable path is supplied, `@vscode/test-electron` downloads a separate 
 
 For a Windows installation using version subdirectories, an updater lock may prevent a new instance from starting. Use `bash scripts/host-test.sh --copy-installed "/path/to/VS Code"` to create an isolated copy under `.vscode-test/isolated-installed`. Only that copy's product metadata is adjusted to disable Windows installer update coordination; the original installation remains read-only. This tests the installed version, not necessarily the minimum supported version.
 
-The package is generated at `artifacts/vscode-codex-speed-0.1.11.vsix`. Starting with 0.1.2, `docs/MARKETPLACE.md` supplies the bilingual user-facing Marketplace overview, and `assets/icon.png` supplies the extension's own icon. Version 0.1.3 includes manifest and runtime translations. The detailed Chinese/English README files remain in the repository. No Node.js dependency installation is required on the server. All VSIX paths use ASCII characters for upload compatibility. Architecture and validation documents remain in the source repository at `docs/设计说明.md` and `docs/验证记录.md`.
+The package is generated at `artifacts/vscode-codex-speed-0.1.12.vsix`. Starting with 0.1.2, `docs/MARKETPLACE.md` supplies the bilingual user-facing Marketplace overview, and `assets/icon.png` supplies the extension's own icon. Version 0.1.3 includes manifest and runtime translations. The detailed Chinese/English README files remain in the repository. No Node.js dependency installation is required on the server. All VSIX paths use ASCII characters for upload compatibility. Architecture and validation documents remain in the source repository at `docs/设计说明.md` and `docs/验证记录.md`.
 
 Run `bash scripts/check-package.sh` to inspect an existing package, optionally passing a VSIX path. Checks reject duplicate paths after lossy ASCII conversion, non-ASCII paths, incorrect publisher/version metadata, and missing entry points or user documentation.
 

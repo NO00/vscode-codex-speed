@@ -26,6 +26,64 @@
     if (value > 0 && value < .0001) return '<$0.0001';
     return new Intl.NumberFormat(latest.locale, { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol', minimumFractionDigits: 2, maximumFractionDigits: value < 1 ? 4 : 2 }).format(value);
   }
+  /** 原始日志时间统一由客户端按所选界面语言显示，重置日期保留日期避免跨日误读。 */
+  function dateTime(value) { return new Date(value).toLocaleString(latest.locale, { hour12: false }); }
+  /** 剩余时间随宿主刷新更新，绝对重置日期始终保留，倒计时不修改厂商百分比。 */
+  function until(value) {
+    const minutes = Math.max(1, Math.ceil((value - latest.data.now) / 60000));
+    const [amount, unit] = minutes >= 2880 ? [Math.ceil(minutes / 1440), 'day'] : minutes >= 60 ? [Math.ceil(minutes / 60), 'hour'] : [minutes, 'minute'];
+    return new Intl.RelativeTimeFormat(latest.locale, { numeric: 'always' }).format(amount, unit);
+  }
+  /** 额度只绘制最新账户快照，到达重置时间后等待新日志，不伪造零用量。 */
+  function drawQuota() {
+    const { data, labels } = latest, quota = data.quota, snapshot = quota.snapshot;
+    const container = document.getElementById('quota-windows'); container.replaceChildren();
+    text('quota-plan', snapshot?.plan || ''); document.getElementById('quota-plan').hidden = !snapshot?.plan;
+    text('quota-empty', labels.quotaMissing); document.getElementById('quota-empty').hidden = !!snapshot;
+    text('quota-age', snapshot ? `${quota.state === 'stale' ? labels.quotaStale : labels.quotaFresh} · ${labels.quotaAge}: ${dateTime(snapshot.observed)}` : '');
+    document.getElementById('quota-age').hidden = !snapshot;
+    for (const window of snapshot?.windows || []) {
+      const expired = window.resetsAt !== undefined && data.now >= window.resetsAt;
+      const item = document.createElement('div'); item.className = `quota-window${expired || quota.state === 'stale' ? ' old-snapshot' : ''}`;
+      const heading = document.createElement('div'); heading.className = 'quota-window-heading';
+      const name = document.createElement('span');
+      const minutes = window.minutes;
+      name.textContent = window.kind === 'fiveHour' ? labels.quotaFiveHour : window.kind === 'sevenDay' ? labels.quotaSevenDay : minutes % 1440 === 0 ? `${number(minutes / 1440)}d` : minutes % 60 === 0 ? `${number(minutes / 60)}h` : `${number(minutes)}m`;
+      const percent = Math.max(0, Math.min(100, window.usedPercent));
+      const value = document.createElement('strong'); value.textContent = `${number(Math.round(percent))}% ${labels.quotaUsed}`;
+      heading.append(name, value);
+      const bar = document.createElement('progress'); bar.max = 100; bar.value = percent;
+      bar.setAttribute('aria-label', `${labels.quota} · ${name.textContent}`); bar.setAttribute('aria-valuetext', value.textContent);
+      const reset = document.createElement('p'); reset.className = 'small muted quota-reset';
+      reset.textContent = expired ? `${labels.quotaExpired} · ${dateTime(window.resetsAt)}` : window.resetsAt === undefined ? labels.quotaUnknownReset : `${labels.quotaReset}: ${dateTime(window.resetsAt)} · ${until(window.resetsAt)}`;
+      item.append(heading, bar, reset); container.append(item);
+    }
+  }
+  /** 等待中的数字为已等待时长；活跃已观测和最近调用使用明确的来源标识。 */
+  function drawLatency() {
+    const { data, labels, context } = latest;
+    const latency = context.enabled && !context.error ? data.latency : { state: 'unavailable', requests: 0 };
+    const stateLabel = labels[{ waiting: 'latencyWaiting', observed: 'latencyObserved', last: 'latencyLast', unavailable: 'latencyUnavailable' }[latency.state]];
+    text('latency-state', stateLabel);
+    text('latency-value', latency.ms === undefined ? '—' : `${latency.state === 'waiting' ? '≥' : ''}${new Intl.NumberFormat(latest.locale, { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(latency.ms / 1000)}`);
+    text('latency-detail', latency.state === 'unavailable' ? labels.latencyMissing : latency.state === 'last' ? `${labels.latencyLast} · ${dateTime(latency.at)}` : `${number(latency.requests)} ${latency.state === 'waiting' ? labels.waitingRequests : labels.observedRequests}`);
+    document.getElementById('latency-value').dataset.state = latency.state;
+  }
+  /** 按模型速度与主读数共享三秒窗口，不从会话显示值二次相加或反推模型。 */
+  function drawModels() {
+    const { data, labels, context } = latest;
+    const container = document.getElementById('model-speeds'); container.replaceChildren();
+    if (!data.models.length) { const empty = document.createElement('p'); empty.className = 'small muted'; empty.textContent = labels.noModelSpeeds; container.append(empty); }
+    for (const model of data.models) {
+      const row = document.createElement('div'); row.className = 'model-speed';
+      const name = document.createElement('strong'); name.className = 'model-speed-name'; name.textContent = model.model || labels.unknownModel;
+      const speed = document.createElement('strong'); speed.className = 'model-speed-rate';
+      speed.textContent = !context.enabled || context.error ? '—' : `${model.estimatedRate > 0 ? '~' : ''}${model.rate.toFixed(1)} tok/s`;
+      speed.title = `${labels.measured}: ${model.measuredRate.toFixed(1)} · ${labels.estimated}: ${model.estimatedRate.toFixed(1)} · ${labels.estimateShare}: ${number(model.estimatedShare * 100)}%`;
+      const activity = document.createElement('span'); activity.className = 'small muted model-speed-activity'; activity.textContent = `${labels.generating}: ${number(model.active)} · ${labels.tools}: ${number(model.tools)} · ${labels.sessions}: ${number(model.sessions)}`;
+      row.append(name, speed, activity); container.append(row);
+    }
+  }
   /** 模型及费用明细只用纯文本 DOM；保留部分估算和未计价的区别。 */
   function drawCosts() {
     const { data, labels } = latest, cost = data.cost;
@@ -180,6 +238,7 @@
     document.documentElement.lang = payload.locale;
     const mapping = { 'dashboard-title': 'console', 'live-label': 'live', 'curve-title': 'curve', 'range-60': 'oneMinute', 'range-120': 'twoMinutes', 'range-300': 'fiveMinutes', 'measured-label': 'measuredPart', 'estimated-label': 'combined', 'curve-note': 'curveNote', 'source-note': 'sourceNote', 'sessions-title': 'sessions', 'usage-title': 'usage', 'output-label': 'output', 'input-label': 'input', 'responses-label': 'responses', 'average-label': 'average', 'peak-label': 'peak', 'usage-note': 'usageNote', 'host-label': 'host', 'directory-label': 'directory', 'scope-label': 'scope', 'language-label': 'language', 'language-auto': 'auto', 'estimate-note': 'estimateNote', 'last-note': 'lastNote', 'stale-note': 'stale', 'privacy-note': 'noCosts', 'connection-title': 'connection', 'session-name-heading': 'sessions', 'session-model-heading': 'model', 'session-output-heading': 'output', 'session-rate-heading': 'rate', 'timezone-label': 'timeZone' };
     for (const [id, key] of Object.entries(mapping)) text(id, labels[key]);
+    for (const [id, key] of Object.entries({ 'insights-title': 'insights', 'latency-title': 'latency', 'latency-note': 'latencyNote', 'quota-title': 'quota', 'quota-note': 'quotaNote', 'model-speeds-title': 'modelSpeeds', 'model-speeds-note': 'modelSpeedNote' })) text(id, labels[key]);
     for (const [value, key] of [['30m', 'last30m'], ['today', 'today'], ['7d', 'last7d'], ['30d', 'last30d']]) text(`usage-${value}`, labels[key]);
     const period = document.getElementById('usage-range');
     period.value = data.usage.range; period.setAttribute('aria-label', labels.usageRange);
@@ -214,9 +273,10 @@
     document.getElementById('last-note').hidden = !hasLast || !context.enabled || context.error;
     document.getElementById('language').value = payload.selectedLanguage;
     for (const [id, key] of [['cost-title', 'apiCost'], ['cost-ordinary-label', 'ordinaryInput'], ['cost-cached-label', 'cachedInput'], ['cost-output-label', 'output'], ['cost-note', 'costNote'], ['cost-settings', 'configurePrices']]) text(id, labels[key]);
-    drawChart(); drawSessions(); drawCosts();
+    drawChart(); drawSessions(); drawCosts(); drawQuota(); drawLatency(); drawModels();
     // 只用于宿主确认脚本收到并绘制了真实数据，不回传路径、模型或会话内容。
-    api.postMessage({ type: 'rendered', locale: payload.locale, sessions: data.sessions.length, usageRange: data.usage.range, output: data.usage.output, costUSD: data.cost.usd, pricedResponses: data.cost.complete, estimatedBuckets: data.points.filter(point => point.estimated > .000001).length, measuredBuckets: data.points.filter(point => point.measured > .000001).length });
+    api.postMessage({ type: 'rendered', locale: payload.locale, sessions: data.sessions.length, usageRange: data.usage.range, output: data.usage.output, costUSD: data.cost.usd, pricedResponses: data.cost.complete, estimatedBuckets: data.points.filter(point => point.estimated > .000001).length, measuredBuckets: data.points.filter(point => point.measured > .000001).length,
+      quotaWindows: data.quota.snapshot?.windows.length || 0, latencyState: data.latency.state, latencyMs: data.latency.ms, modelCount: data.models.length });
   }
   for (const button of document.querySelectorAll('[data-range]')) button.addEventListener('click', () => {
     range = Number(button.dataset.range); api.setState({ range }); if (latest) drawChart();

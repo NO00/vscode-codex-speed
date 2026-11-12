@@ -16,7 +16,8 @@ interface Diagnostics {
   home: string;
   /** 实际 Webview 可见状态及前端回传的渲染确认。 */
   dashboardVisible: boolean;
-  dashboardRender?: { locale: string; sessions: number; usageRange?: string; output?: number; estimatedBuckets?: number; measuredBuckets?: number; costUSD?: number; pricedResponses?: number };
+  dashboardRender?: { locale: string; sessions: number; usageRange?: string; output?: number; estimatedBuckets?: number; measuredBuckets?: number; costUSD?: number; pricedResponses?: number;
+    quotaWindows?: number; latencyState?: string; latencyMs?: number; modelCount?: number };
 }
 
 /** 等待异步状态栏刷新，在限定时间内失败而不是永久阻塞。 */
@@ -55,8 +56,12 @@ export async function run(): Promise<void> {
       row(now - 5000, 'session_meta', { id: 'host-test', cwd: '/project' }),
       row(now - 4500, 'turn_context', { model: 'gpt-6.1-sol' }),
       row(now - 4000, 'event_msg', { type: 'task_started' }),
+      row(now - 2500, 'response_item', { type: 'reasoning' }),
       row(now - 1000, 'token_usage_record', { response_id: 'one', usage: { output_tokens: 300, input_tokens: 1000, cached_input_tokens: 800, cache_write_input_tokens: 0 } }),
-      row(now - 900, 'event_msg', { type: 'task_complete' })
+      row(now - 900, 'event_msg', { type: 'task_complete' }),
+      row(now - 800, 'event_msg', { type: 'token_count', rate_limits: { limit_id: 'codex', plan_type: 'pro',
+        primary: { used_percent: 23, window_minutes: 300, resets_at: Math.floor(now / 1000) + 3600 },
+        secondary: { used_percent: 41, window_minutes: 10080, resets_in_seconds: 86400 } } })
     ].join('\n') + '\n');
     await vscode.commands.executeCommand('codexSpeed.refresh');
     const measured = await waitFor(d => d.state?.snapshot.output === 300);
@@ -72,6 +77,7 @@ export async function run(): Promise<void> {
     await waitFor(d => d.dashboardVisible && d.dashboardRender?.sessions === 1);
     await waitFor(d => d.dashboardRender?.usageRange === 'today' && d.dashboardRender.output === 300);
     await waitFor(d => d.dashboardRender?.pricedResponses === 1 && Math.abs((d.dashboardRender.costUSD ?? 0) - .00348) < .00000001);
+    await waitFor(d => d.dashboardRender?.quotaWindows === 2 && d.dashboardRender.latencyState === 'last' && d.dashboardRender.latencyMs === 1500);
     // 修改单价即时重算，不重启监控，输出计数和语言切换均保留。
     await vscode.workspace.getConfiguration('codexSpeed').update('priceOverrides', { 'gpt-6.1-sol': { input: 0, cachedInput: 0, output: 0 } }, vscode.ConfigurationTarget.Global);
     await waitFor(d => d.dashboardRender?.costUSD === 0 && d.dashboardRender.pricedResponses === 1 && d.state?.snapshot.output === 300);
@@ -105,6 +111,9 @@ export async function run(): Promise<void> {
     await fs.appendFile(file, row(now, 'event_msg', { type: 'task_started' }) + '\n');
     const estimated = await waitFor(d => d.state?.snapshot.kind === 'estimated');
     assert.match(estimated.text, /~/);
+    await waitFor(d => d.dashboardRender?.latencyState === 'waiting' && (d.dashboardRender.latencyMs ?? -1) >= 0 && d.dashboardRender.modelCount === 1 && d.dashboardRender.quotaWindows === 2);
+    await fs.appendFile(file, row(Date.now(), 'response_item', { type: 'reasoning' }) + '\n');
+    await waitFor(d => d.dashboardRender?.latencyState === 'observed');
     await waitFor(d => (d.dashboardRender?.estimatedBuckets ?? 0) > 0 && (d.dashboardRender?.measuredBuckets ?? 0) > 0);
     await vscode.workspace.getConfiguration('codexSpeed').update('showEstimates', false, vscode.ConfigurationTarget.Global);
     const waiting = await waitFor(d => d.state?.snapshot.kind === 'waiting');
@@ -118,6 +127,7 @@ export async function run(): Promise<void> {
       const declared: string | { value: string; original: string } = extension.packageJSON.contributes.commands.find((item: { command: string }) => item.command === 'codexSpeed.showDetails').title;
       assert.equal(declared, commandTitle, '手动语言不改变 VS Code 原生清单标题');
       await waitFor(d => d.dashboardRender?.locale === (selected === 'auto' ? locale : selected));
+      await waitFor(d => d.dashboardRender?.quotaWindows === 2 && d.dashboardRender.latencyState === 'observed' && d.dashboardRender.modelCount === 1);
       await waitFor(d => Math.abs((d.dashboardRender?.costUSD ?? 0) - .00348) < .00000001);
     }
     now = Date.now();
@@ -140,6 +150,12 @@ export async function run(): Promise<void> {
     await vscode.workspace.getConfiguration('codexSpeed').update('codexHome', compatibilityHome, vscode.ConfigurationTarget.Global);
     await waitFor(d => d.home === compatibilityHome && d.state?.snapshot.output === 60 && d.state.snapshot.latest?.start === compatibilityNow - 4000);
     await waitFor(d => d.dashboardRender?.pricedResponses === 1 && Math.abs((d.dashboardRender.costUSD ?? 0) - .000648) < 1e-10);
+    const parallelFile = path.join(compatibilityHome, 'sessions', 'parallel.jsonl'), parallelNow = Date.now();
+    await fs.appendFile(compatibilityFile, row(parallelNow, 'event_msg', { type: 'task_started' }) + '\n');
+    await fs.writeFile(parallelFile, [row(parallelNow - 200, 'session_meta', { id: 'parallel', cwd: '/project' }),
+      row(parallelNow - 100, 'turn_context', { model: 'gpt-6-astra' }), row(parallelNow, 'event_msg', { type: 'task_started' })].join('\n') + '\n');
+    await vscode.commands.executeCommand('codexSpeed.refresh');
+    await waitFor(d => d.dashboardRender?.modelCount === 2 && d.dashboardRender.quotaWindows === 0 && d.dashboardRender.latencyState === 'waiting');
     await vscode.workspace.getConfiguration('codexSpeed').update('codexHome', home, vscode.ConfigurationTarget.Global);
     await waitFor(d => d.home === home && d.state?.snapshot.output === 420);
     const empty = { snapshot: { rate: 0, measuredRate: 0, estimatedRate: 0, estimatedShare: 0, kind: 'idle' as const, active: 0, sessions: 0, responses: 0, output: 0, latest: undefined }, notice: '', error: true, limited: false };
@@ -165,7 +181,7 @@ export async function run(): Promise<void> {
     await vscode.workspace.getConfiguration('codexSpeed').update('language', 'auto', vscode.ConfigurationTarget.Global);
     await vscode.workspace.getConfiguration('codexSpeed').update('enabled', true, vscode.ConfigurationTarget.Global);
     await waitFor(d => d.state?.snapshot.output === 420 && d.dashboardRender?.locale === locale);
-    await fs.writeFile(report, JSON.stringify({ ok: true, locale: vscode.env.language, checks: ['真实宿主加载', 'workspace 远程部署声明', '日志发现与状态栏文字', '无窗口内输出时状态栏归零', '实测/估算/等待切换', '配置变更重启', '增量输出去重', '路径错误与恢复', '客户端语言及原生翻译加载', '悬浮摘要及错误提示翻译', '手动切换四种语言选项并保留用量', '错误提示随手动语言切换', 'Webview 实际脚本渲染与语言更新', '关闭并重开仪表盘', '停用监控后仍可切换面板语言', '默认今天和四种用量时间范围', '历史记录只在对应范围内累计', '三项 API 等值费用实际渲染', '修改单价即时重算并恢复', '语言切换保留费用', 'Codex 原生缓存写入零值', '分页子会话排除继承历史', '子 agent 邮箱请求计时'] }));
+    await fs.writeFile(report, JSON.stringify({ ok: true, locale: vscode.env.language, checks: ['真实宿主加载', 'workspace 远程部署声明', '日志发现与状态栏文字', '无窗口内输出时状态栏归零', '实测/估算/等待切换', '配置变更重启', '增量输出去重', '路径错误与恢复', '客户端语言及原生翻译加载', '悬浮摘要及错误提示翻译', '手动切换四种语言选项并保留用量', '错误提示随手动语言切换', 'Webview 实际脚本渲染与语言更新', '关闭并重开仪表盘', '停用监控后仍可切换面板语言', '默认今天和四种用量时间范围', '历史记录只在对应范围内累计', '三项 API 等值费用实际渲染', '修改单价即时重算并恢复', '语言切换保留费用', 'Codex 原生缓存写入零值', '分页子会话排除继承历史', '子 agent 邮箱请求计时', '订阅额度双周期实际渲染及切换目录清空', '首段等待从进行中切换到已观测', '并发模型汇总与语言切换'] }));
   } catch (error) {
     await fs.writeFile(report, JSON.stringify({ ok: false, error: error instanceof Error ? error.stack : String(error) }));
     throw error;

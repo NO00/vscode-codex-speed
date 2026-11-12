@@ -4,6 +4,17 @@ import { Translate } from '../localization';
 export function dashboardMessages(t: Translate): Record<string, string> {
   return {
     console: t('Monitoring console'), connection: t('Connection details'), rate: t('Rate'),
+    insights: t('Runtime insights'), quota: t('Subscription quota'), quotaUsed: t('used'), quotaReset: t('Resets'),
+    quotaMissing: t('No subscription quota recorded in these Codex logs.'), quotaStale: t('Older snapshot'), quotaFresh: t('Log snapshot'),
+    quotaExpired: t('Reset time passed; awaiting new logs'), quotaUnknownReset: t('Reset time unavailable'),
+    quotaFiveHour: t('5-hour window'), quotaSevenDay: t('Weekly window'),
+    quotaNote: t('Account quota from the newest log snapshot in this Codex Home, across all workspaces. Not summed across sessions; no credential access or API requests.'),
+    quotaAge: t('Recorded'), latency: t('First-content wait'), latencyWaiting: t('Longest ongoing wait'),
+    latencyObserved: t('Observed for active requests'), latencyLast: t('Last observed call'), latencyUnavailable: t('Not available'), latencyMissing: t('No request start and first-content pair available.'),
+    latencyNote: t('Request start to the first reasoning, assistant or tool-call event written to the log. Logging can lag token arrival. Ongoing waits are elapsed time, not completed latency.'),
+    waitingRequests: t('requests awaiting content'), observedRequests: t('observed requests'),
+    modelSpeeds: t('Speed by model'), noModelSpeeds: t('No active models or speed in the current window.'),
+    modelSpeedNote: t('Same 3-second window as the main reading. Completed calls use their recorded model; in-flight estimates use the current model.'),
     dashboard: t('Dashboard'), live: t('Live output'), generating: t('Generating'), tools: t('Tools'), idle: t('Idle'),
     measured: t('Measured'), estimated: t('Estimated'), last: t('Last'), waiting: t('Waiting for counts'),
     curve: t('Output speed'), oneMinute: t('1 min'), twoMinutes: t('2 min'), fiveMinutes: t('5 min'),

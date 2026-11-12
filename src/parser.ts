@@ -1,5 +1,7 @@
 import { Phase, Sample, Session } from './types';
 import { beforeOrdinal, readOrdinal } from './parsing/ordinal';
+import { readQuota } from './metrics/quota';
+import type { QuotaSnapshot } from './metrics/types';
 
 /** 将未知 JSON 值收窄为对象，避免依赖具体 Codex 版本的未验证字段。 */
 export function object(value: unknown): Record<string, unknown> | undefined {
@@ -23,6 +25,8 @@ export interface ParserCheckpoint {
   subagentStartOrdinal?: string; agentPath?: string;
   /** 未完成调用和流式响应状态。 */
   phase: Phase; pendingStart?: number; lastEvent: number; created?: number; streaming: boolean; modern: boolean;
+  /** 当前调用首段时间，断点恢复后不能把后续内容当成首段。 */
+  firstContent?: number;
   /** 旧日志的上一份累计计数，缓存字段缺失时保留未知。 */
   previous?: { input_tokens?: number; output_tokens: number; total_tokens: number; cached_input_tokens?: number; cache_write_tokens?: number };
 }
@@ -41,6 +45,10 @@ export class CodexParser implements Session {
   phase: Phase = 'idle';
   /** 模型请求起点，工具结果到达后重新计时。 */
   pendingStart: number | undefined;
+  /** 当前调用首次内容落盘时间，只记录时间戳而不保存正文。 */
+  firstContent: number | undefined;
+  /** 账户额度独立于用量去重，不读取登录凭证。 */
+  quota: QuotaSnapshot | undefined;
   /** 最近日志事件时间，用于剔除失联会话的估算。 */
   lastEvent = 0;
   /** 有界保留的已解析用量记录。 */
@@ -66,7 +74,7 @@ export class CodexParser implements Session {
   /** 在完整换行之后保存断点，下一次启动可直接从已提交字节偏移继续。 */
   checkpoint(): ParserCheckpoint {
     return { id: this.id, cwd: this.cwd, model: this.model, phase: this.phase, pendingStart: this.pendingStart, lastEvent: this.lastEvent,
-      created: this.created, streaming: this.streaming, modern: this.modern, subagentStartOrdinal: this.subagentStartOrdinal, agentPath: this.agentPath,
+      created: this.created, streaming: this.streaming, modern: this.modern, subagentStartOrdinal: this.subagentStartOrdinal, agentPath: this.agentPath, firstContent: this.firstContent,
       previous: this.previous ? { input_tokens: count(this.previous.input_tokens), output_tokens: tokens(this.previous.output_tokens), total_tokens: tokens(this.previous.total_tokens),
         cached_input_tokens: this.cacheCount(this.previous), cache_write_tokens: this.writeCount(this.previous) } : undefined };
   }
@@ -75,6 +83,7 @@ export class CodexParser implements Session {
   restore(state: ParserCheckpoint): void {
     this.id = state.id; this.cwd = state.cwd; this.model = state.model; this.phase = state.phase;
     this.pendingStart = state.pendingStart; this.lastEvent = state.lastEvent; this.created = state.created;
+    this.firstContent = state.firstContent;
     this.subagentStartOrdinal = state.subagentStartOrdinal; this.agentPath = state.agentPath ?? '/root';
     this.streaming = state.streaming; this.modern = state.modern; this.previous = state.previous;
   }
@@ -120,9 +129,11 @@ export class CodexParser implements Session {
     if (row.type === 'token_usage_record') { this.modernUsage(p, time); return; }
     if (row.type === 'event_msg') {
       if (type === 'task_complete' || type === 'turn_aborted') {
-        this.phase = 'idle'; this.pendingStart = undefined; this.streaming = false;
+        this.phase = 'idle'; this.pendingStart = undefined; this.streaming = false; this.firstContent = undefined;
       } else if (type === 'task_started' || type === 'user_message') this.input(time);
       else if (type === 'token_count') {
+        const quota = readQuota(p.rate_limits, time);
+        if (quota && (!this.quota || quota.observed > this.quota.observed)) this.quota = quota;
         if (!this.modern) this.legacyUsage(p, time);
         else if (this.streaming) this.endResponse(time);
       }
@@ -131,12 +142,14 @@ export class CodexParser implements Session {
     if (row.type !== 'response_item' || typeof type !== 'string') return;
     if (type === 'agent_message') {
       // 邮箱仅校准将来请求的起点，不把空闲或工具阶段直接唤醒为生成中。
-      if (p.recipient === this.agentPath && !this.streaming) this.pendingStart = time;
+      if (p.recipient === this.agentPath && !this.streaming) { this.pendingStart = time; this.firstContent = undefined; }
       return;
     }
     if (type.endsWith('_output') || (type === 'message' && ['user', 'system', 'developer'].includes(String(p.role)))) {
       this.input(time);
     } else if (type === 'reasoning' || type.endsWith('_call') || (type === 'message' && p.role === 'assistant')) {
+      // 旧检查点可能已经处于流式阶段却没有首段时间，此时后续片段不能冒充首段。
+      if (!this.streaming) this.firstContent = time;
       this.streaming = true;
       this.phase = 'generating';
       // 若尾部读取漏掉了请求输入，输出事件不能冒充请求起点。
@@ -145,7 +158,7 @@ export class CodexParser implements Session {
 
   /** 输入代表新请求即将发出；从工具结果到下一次用量记录的间隔计入生成。 */
   private input(time: number): void {
-    if (!this.streaming) this.pendingStart = time;
+    if (!this.streaming) { this.pendingStart = time; this.firstContent = undefined; }
     this.phase = 'generating';
   }
 
@@ -191,7 +204,7 @@ export class CodexParser implements Session {
   private add(key: string, usage: Record<string, unknown>, time: number, model = this.model): void {
     if (this.keys.has(key)) return;
     this.keys.add(key);
-    const sample: Sample = { key, start: this.pendingStart, end: time, output: tokens(usage.output_tokens), input: tokens(usage.input_tokens),
+    const sample: Sample = { key, start: this.pendingStart, firstContent: this.firstContent, end: time, output: tokens(usage.output_tokens), input: tokens(usage.input_tokens),
       inputKnown: count(usage.input_tokens) !== undefined, cachedInput: this.cacheCount(usage), cacheWriteInput: this.writeCount(usage), model };
     this.samples.push(sample);
     this.onSample?.(sample);
@@ -214,6 +227,6 @@ export class CodexParser implements Session {
 
   /** 用量完成后进入工具阶段，等待工具结果或整轮完成事件。 */
   private endResponse(time: number): void {
-    this.pendingStart = time; this.streaming = false; this.phase = 'tools';
+    this.pendingStart = time; this.streaming = false; this.phase = 'tools'; this.firstContent = undefined;
   }
 }

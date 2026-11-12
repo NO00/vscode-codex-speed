@@ -13,10 +13,16 @@ const options = { home: '/home/ubuntu/.codex', scope: 'all', workspaces: [], sho
 const sessions = ['vscode-codex-speed', 'api-service', 'docs'].map((name, index) => ({
   file: `/preview/${name}.jsonl`, id: name, cwd: `/workspace/${name}`, model: index === 1 ? 'gpt-6.1-sol' : 'gpt-6-astra',
   phase: ['generating', 'tools', 'idle'][index], pendingStart: now - 5000, lastEvent: now - (index === 2 ? 400000 : 1000),
+  firstContent: index === 0 ? now - 3700 : undefined,
   samples: Array.from({ length: 24 }, (_, item) => ({ key: `${name}:${item}`, start: now - 720000 + item * 30000 + index * 1500,
     end: now - 720000 + item * 30000 + index * 1500 + 8000 + item % 4 * 2000, output: 500 + (item % 5) * 160 + index * 120, input: 11000 + item * 170,
     inputKnown: true, cachedInput: 8000 + item * 100, cacheWriteInput: 0, model: index === 1 ? 'gpt-6.1-sol' : 'gpt-6-astra' }))
 }));
+// 两个订阅周期来自同一份虚拟账户快照，绝不读取实际账户或请求额度接口。
+sessions[0].quota = { observed: now - 45000, plan: 'pro', windows: [
+  { kind: 'fiveHour', minutes: 300, usedPercent: 23, resetsAt: now + 7200000 },
+  { kind: 'sevenDay', minutes: 10080, usedPercent: 41, resetsAt: now + 3 * 86400000 }
+] };
 const history = new DashboardHistory();
 /** 生成与真实 Webview 相同的数据及翻译，只改变日志来源为虚拟记录。 */
 function payload(selectedLanguage, selectedRange = 'today', selectedZone = 'Asia/Shanghai', scenario = '') {
@@ -44,6 +50,11 @@ function payload(selectedLanguage, selectedRange = 'today', selectedZone = 'Asia
     { key: 'missing-writes', start: now - 2000, end: now - 1000, input: 100000, inputKnown: true, cachedInput: 80000, output: 10000, model: 'gpt-6.1-sol' }
   ] }];
   if (scenario === 'tiny-cost') currentSessions = [{ ...sessions[0], samples: [{ key: 'tiny', start: now - 2000, end: now - 1000, input: 1, inputKnown: true, cachedInput: 0, cacheWriteInput: 0, output: 0, model: 'gpt-6.1-sol' }] }];
+  if (scenario === 'quota-missing') currentSessions = currentSessions.map(session => ({ ...session, quota: undefined }));
+  if (scenario === 'quota-stale') currentSessions = currentSessions.map(session => ({ ...session, quota: session.quota ? { ...session.quota, observed: now - 7200000,
+    windows: session.quota.windows.map(window => ({ ...window, resetsAt: now - 1000 })) } : undefined }));
+  if (scenario === 'latency-waiting') currentSessions = currentSessions.map(session => ({ ...session, firstContent: undefined }));
+  if (scenario === 'empty') currentSessions = [];
   const currentSnapshot = calculate(currentSessions, options, now);
   const records = currentSessions.flatMap(session => [...session.samples.map(sample => ({ ...sample, cwd: session.cwd, session: session.id })),
     ...[7200000, 2 * 86400000, 5 * 86400000, 12 * 86400000, 25 * 86400000].map((age, index) => ({ key: `${session.id}:old:${index}`, start: now - age - 10000, end: now - age,

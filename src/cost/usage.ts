@@ -10,6 +10,8 @@ export function enrichUsage<T extends Sample>(primary: T, other: Sample): T {
   const fallback = input === primary ? other : primary;
   const match = primary.input === other.input;
   return { ...primary, model: !primary.model || primary.model === '未知模型' ? other.model : primary.model,
+    // 同一请求边界的镜像才可以补齐首段时间，避免拼出另一请求的等待时长。
+    firstContent: primary.firstContent ?? (primary.start === other.start && primary.end === other.end ? other.firstContent : undefined),
     input: input.input, inputKnown: primaryKnown || otherKnown,
     cachedInput: match ? input.cachedInput ?? fallback.cachedInput : input.cachedInput,
     cacheWriteInput: match ? input.cacheWriteInput ?? fallback.cacheWriteInput : input.cacheWriteInput };

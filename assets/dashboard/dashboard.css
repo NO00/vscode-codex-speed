@@ -16,6 +16,7 @@ body { margin: 0; color: var(--fg); background: var(--bg); font: 13px/1.6 var(--
 body.vscode-light { color-scheme: light; --estimate: #087f75; }
 h2, p { margin: 0; }
 h2 { font-size: 14px; font-weight: 600; letter-spacing: .2px; }
+h3 { margin: 0; font-size: 12px; font-weight: 600; }
 button, select { color: var(--fg); background: var(--panel); border: 1px solid var(--border); font: inherit; cursor: pointer; }
 button:hover, select:hover { border-color: var(--accent); }
 button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--vscode-focusBorder, var(--accent)); outline-offset: 3px; }
@@ -88,6 +89,37 @@ body[data-state="estimated"] #phase-dot { background: var(--estimate); }
 #curve-note { max-width: 370px; font-size: 10px; }
 .chart-legend { display: flex; gap: 13px; flex-shrink: 0; color: var(--muted); font-size: 10px; }
 .chart-legend > span { display: flex; align-items: center; gap: 5px; }
+
+/* 运行概况以等待和账户额度并列，模型速度单独列出，保持与主读数相同的蓝绿配色。 */
+.runtime-grid { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.4fr); gap: 12px; }
+.runtime-card { min-width: 0; padding: 17px 19px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel); }
+.runtime-card .section-heading { flex-wrap: wrap; gap: 7px; margin-bottom: 13px; }
+.latency-reading { display: flex; align-items: baseline; gap: 7px; margin: 4px 0; }
+#latency-value { font: 500 32px/1.4 var(--mono); color: var(--estimate); overflow-wrap: anywhere; }
+#latency-value[data-state="unavailable"] { color: var(--muted); }
+#latency-state { white-space: normal; }
+#latency-note, #quota-note, #model-speeds-note { margin-top: 13px; font-size: 10px; }
+.quota-windows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+.quota-window { min-width: 0; }
+.quota-window-heading { display: flex; flex-wrap: wrap; gap: 3px 8px; justify-content: space-between; font-size: 10px; }
+.quota-window-heading strong { font-family: var(--mono); color: var(--estimate); }
+.quota-window progress { display: block; appearance: none; width: 100%; height: 5px; border: 0; border-radius: 3px; overflow: hidden; margin: 10px 0; background: var(--border); accent-color: var(--estimate); }
+.quota-window progress::-webkit-progress-bar { background: var(--border); }
+.quota-window progress::-webkit-progress-value { background: var(--estimate); }
+.quota-window progress::-moz-progress-bar { background: var(--estimate); }
+.old-snapshot progress { opacity: .5; }
+.quota-reset { overflow-wrap: anywhere; font-size: 10px; }
+#quota-plan { max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
+#quota-age { margin-top: 10px; font-size: 10px; }
+.models-card { margin-top: 12px; }
+.model-speeds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 24px; margin-top: 12px; }
+.model-speed { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 9px; min-width: 0; padding: 7px 0; border-top: 1px solid var(--border); }
+.model-speed-name { font-size: 11px; overflow-wrap: anywhere; }
+.model-speed-rate { font: 12px var(--mono); color: var(--estimate); white-space: nowrap; }
+.model-speed-activity { grid-column: 1 / -1; font-size: 10px; }
+@media (max-width: 740px) { .runtime-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 540px) { .model-speeds { grid-template-columns: minmax(0, 1fr); } .runtime-card { padding: 15px; } .quota-windows { gap: 12px; } }
+@media (max-width: 340px) { .quota-windows { grid-template-columns: minmax(0, 1fr); } }
 .legend-line { width: 14px; height: 0; border-top: 2px solid var(--accent); }
 .legend-line.dashed { border-color: var(--estimate); border-top-style: dashed; }
 .empty-chart { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 11px; }

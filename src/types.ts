@@ -1,3 +1,5 @@
+import type { QuotaSnapshot } from './metrics/types';
+
 /** 解析器识别的会话状态；工具执行不计入模型生成耗时。 */
 export type Phase = 'idle' | 'generating' | 'tools';
 
@@ -7,6 +9,8 @@ export interface Sample {
   key: string;
   /** 请求起点；截断日志无法确定起点时为空。 */
   start: number | undefined;
+  /** 首段 reasoning、assistant 或工具调用事件的落盘时间；不是逐 token 到达时间。 */
+  firstContent?: number;
   /** 用量记录时间，单位为毫秒。 */
   end: number;
   /** 输出 token，已包含 reasoning，不能再次加上 reasoning。 */
@@ -37,6 +41,10 @@ export interface Session {
   phase: Phase;
   /** 当前模型调用的起点。 */
   pendingStart: number | undefined;
+  /** 当前请求首段内容事件的时间，输入、完成和取消时重置。 */
+  firstContent?: number;
+  /** 此日志最近一次账户额度，不受响应去重影响。 */
+  quota?: QuotaSnapshot;
   /** 最近有效事件的日志时间。 */
   lastEvent: number;
   /** 近半小时的已解析响应。 */

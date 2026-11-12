@@ -17,6 +17,14 @@ export interface DashboardPayload {
   context: { host: string; home: string; scope: string; notice: string; error: boolean; limited: boolean; enabled: boolean };
 }
 
+/** 前端绘制确认只保留数量和状态，不回传额度百分比、模型或会话内容。 */
+interface DashboardRender {
+  /** 生效语言、会话数、所选周期及旧版统计验证字段。 */
+  locale: string; sessions: number; usageRange?: string; output?: number; estimatedBuckets?: number; measuredBuckets?: number; costUSD?: number; pricedResponses?: number;
+  /** 新运行概况仅回传数量和等待读数，供真实宿主回放确认。 */
+  quotaWindows?: number; latencyState?: string; latencyMs?: number; modelCount?: number;
+}
+
 /** 单例仪表盘宿主；只向可见面板发消息，关闭时释放 Webview 及所有监听。 */
 export class DashboardPanel implements vscode.Disposable {
   /** 目前打开的单个编辑器面板。 */
@@ -24,7 +32,7 @@ export class DashboardPanel implements vscode.Disposable {
   /** 面板相关监听，关闭后统一释放。 */
   private subscriptions: vscode.Disposable[] = [];
   /** 最近一次来自页面脚本的渲染确认，只保存语言及数量。 */
-  private rendered: { locale: string; sessions: number; usageRange?: string; output?: number; estimatedBuckets?: number; measuredBuckets?: number; costUSD?: number; pricedResponses?: number } | undefined;
+  private rendered: DashboardRender | undefined;
 
   /** 注入只读数据提供器和有限的用户操作，避免 Webview 执行任意命令。 */
   constructor(private readonly extensionUri: vscode.Uri, private readonly getPayload: () => DashboardPayload,
@@ -52,7 +60,11 @@ export class DashboardPanel implements vscode.Disposable {
         if (message.type === 'usageRange' && ['30m', 'today', '7d', '30d'].includes(message.value)) this.actions.usageRange(message.value);
         if (message.type === 'rendered' && typeof message.locale === 'string' && Number.isSafeInteger(message.sessions)) this.rendered = { locale: message.locale, sessions: message.sessions, usageRange: message.usageRange, output: message.output, estimatedBuckets: Number.isSafeInteger(message.estimatedBuckets) ? message.estimatedBuckets : undefined, measuredBuckets: Number.isSafeInteger(message.measuredBuckets) ? message.measuredBuckets : undefined,
           costUSD: typeof message.costUSD === 'number' && Number.isFinite(message.costUSD) && message.costUSD >= 0 ? message.costUSD : undefined,
-          pricedResponses: Number.isSafeInteger(message.pricedResponses) && message.pricedResponses >= 0 ? message.pricedResponses : undefined };
+          pricedResponses: Number.isSafeInteger(message.pricedResponses) && message.pricedResponses >= 0 ? message.pricedResponses : undefined,
+          quotaWindows: Number.isSafeInteger(message.quotaWindows) && message.quotaWindows >= 0 && message.quotaWindows <= 2 ? message.quotaWindows : undefined,
+          latencyState: ['waiting', 'observed', 'last', 'unavailable'].includes(message.latencyState) ? message.latencyState : undefined,
+          latencyMs: typeof message.latencyMs === 'number' && Number.isFinite(message.latencyMs) && message.latencyMs >= 0 ? message.latencyMs : undefined,
+          modelCount: Number.isSafeInteger(message.modelCount) && message.modelCount >= 0 ? message.modelCount : undefined };
       })];
   }
 
@@ -63,7 +75,7 @@ export class DashboardPanel implements vscode.Disposable {
   get visible(): boolean { return this.panel?.visible ?? false; }
 
   /** 回放验收用的精简确认，不包含用户会话内容。 */
-  get lastRender(): { locale: string; sessions: number; usageRange?: string; output?: number; estimatedBuckets?: number; measuredBuckets?: number; costUSD?: number; pricedResponses?: number } | undefined { return this.rendered; }
+  get lastRender(): DashboardRender | undefined { return this.rendered; }
 
   /** 释放监听列表，避免多次打开后重复处理菜单操作。 */
   private clearListeners(): void { this.subscriptions.splice(0).forEach(item => item.dispose()); }

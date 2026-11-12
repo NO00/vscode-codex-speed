@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { MonitorOptions, Sample, Session, Snapshot } from './types';
+import type { ModelSpeed } from './metrics/types';
 
 /** 一秒桶分别保存日志计数与在途估算，完成记录到达后整条序列重新计算。 */
 export interface SpeedPoint {
@@ -19,6 +20,8 @@ export interface SpeedFrame {
   snapshot: Snapshot;
   /** 全局参考计算后的各独立会话快照。 */
   agents: Map<string, Snapshot>;
+  /** 仪表盘完整帧按响应模型分配速度；状态栏省略这项汇总。 */
+  models: ModelSpeed[];
   /** 最近三百个一秒桶；状态栏计算时省略。 */
   points: SpeedPoint[];
 }
@@ -116,6 +119,14 @@ export function calculateFrame(sessions: Session[], options: Pick<MonitorOptions
   const selected = select(sessions, options, now);
   const timed = selected.samples.filter(record => measured(record.sample)).sort((a, b) => b.sample.end - a.sample.end || (a.sample.key < b.sample.key ? -1 : a.sample.key > b.sample.key ? 1 : 0));
   const live = new Map<string, { measured: number; estimated: number }>();
+  const models = includeHistory ? new Map<string, ModelSpeed & { owners: Set<string> }>() : undefined;
+  /** 按模型累计与主读数完全相同的速度贡献，并以会话身份去重关联数量。 */
+  function modelValue(name: string, owner: string): ModelSpeed & { owners: Set<string> } {
+    const model = name === '未知模型' ? '' : name;
+    let value = models!.get(model);
+    if (!value) { value = { model, rate: 0, measuredRate: 0, estimatedRate: 0, estimatedShare: 0, active: 0, tools: 0, sessions: 0, owners: new Set() }; models!.set(model, value); }
+    value.owners.add(owner); return value;
+  }
   // 建立单次索引，避免每个活跃会话反复过滤、排序整个主机的所有响应。
   const owned = new Map<string, OwnedSample[]>(), ownReferences = new Map<string, OwnedSample[]>(), modelReferences = new Map<string, OwnedSample[]>();
   const latestByOwner = new Map<string, Sample>();
@@ -131,13 +142,19 @@ export function calculateFrame(sessions: Session[], options: Pick<MonitorOptions
     const model = modelReferences.get(sample.model) ?? [];
     if (model.length < 10) { model.push(record); modelReferences.set(sample.model, model); }
     const start = sample.end - sampleDuration(sample), rate = sampleRate(sample);
-    live.get(owner)!.measured += rate * overlap(windowStart, now, start, sample.end) / 3000;
+    const contribution = rate * overlap(windowStart, now, start, sample.end) / 3000;
+    live.get(owner)!.measured += contribution;
+    if (models && contribution > 0) modelValue(sample.model, owner).measuredRate += contribution;
     counted?.add(start, sample.end, rate);
   }
   const sourceReference = reference(timed, 10);
   let activeCount = 0, tools = 0;
   for (const agent of selected.agents) {
     const fresh = agent.lastEvent >= now - 300000 && agent.lastEvent <= now;
+    if (models && fresh && agent.phase !== 'idle') {
+      const model = modelValue(agent.model, agent.id);
+      if (agent.phase === 'generating') model.active++; else model.tools++;
+    }
     if (fresh && agent.phase === 'tools') tools++;
     if (!fresh || agent.phase !== 'generating') continue;
     activeCount++;
@@ -151,6 +168,7 @@ export function calculateFrame(sessions: Session[], options: Pick<MonitorOptions
     const start = Math.max(agent.pendingStart, lastEnd);
     const estimate = speed * overlap(windowStart, now, start, now) / 3000;
     live.get(agent.id)!.estimated += estimate;
+    if (models && estimate > 0) modelValue(agent.model, agent.id).estimatedRate += estimate;
     predicted?.add(start, now, speed);
   }
   /** 根据实际数值给出来源与占比；零贡献估算不能覆盖实测状态。 */
@@ -169,7 +187,11 @@ export function calculateFrame(sessions: Session[], options: Pick<MonitorOptions
   const measuredBuckets = counted?.result() ?? [], estimatedBuckets = predicted?.result() ?? [];
   const firstSecond = Math.floor(now / 1000) - 299;
   const points = measuredBuckets.map((value, index) => ({ time: (firstSecond + index) * 1000, measured: value, estimated: estimatedBuckets[index]!, rate: value + estimatedBuckets[index]! }));
-  return { snapshot: aggregate, agents, points };
+  const modelSpeeds = [...models?.values() ?? []].map(({ owners, ...value }) => {
+    const rate = value.measuredRate + value.estimatedRate;
+    return { ...value, rate, estimatedShare: rate > 0 ? value.estimatedRate / rate : 0, sessions: owners.size };
+  }).sort((a, b) => b.rate - a.rate || a.model.localeCompare(b.model));
+  return { snapshot: aggregate, agents, points, models: modelSpeeds };
 }
 
 /** 状态栏不构造历史桶；主读数与仪表盘仍共用完整计算口径。 */

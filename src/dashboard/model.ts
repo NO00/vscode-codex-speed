@@ -6,6 +6,9 @@ import { defaultPrices } from '../cost/catalog';
 import { CostSummary, PriceBook } from '../cost/types';
 import { estimateCost } from '../cost/estimate';
 import { enrichUsage } from '../cost/usage';
+import { summarizeQuota } from '../metrics/quota';
+import { summarizeLatency } from '../metrics/latency';
+import type { LatencySummary, ModelSpeed, QuotaSummary } from '../metrics/types';
 
 /** 单个会话的计数摘要，仅传递元数据，不传递对话正文。 */
 export interface SessionSummary {
@@ -41,6 +44,10 @@ export interface DashboardData {
   now: number;
   /** 当前测速快照。 */
   snapshot: Snapshot;
+  /** 账户额度与调用等待均来自已读取日志，不额外扫描或联网。 */
+  quota: QuotaSummary; latency: LatencySummary;
+  /** 和快照同一三秒窗口内的按模型速度。 */
+  models: ModelSpeed[];
   /** 最近三百个一秒桶，实测与估算部分独立并可在完成后校正。 */
   points: SpeedPoint[];
   /** 过滤和合并后的会话列表。 */
@@ -55,8 +62,8 @@ export interface DashboardData {
 
 /** 从已有解析结果重建三百秒曲线，不另开日志扫描、模型请求或计时器。 */
 export class DashboardHistory {
-  /** 只有面板可见时构造会话及用量，常规状态栏轮询不重复汇总。 */
-  data(sessions: Session[], options: MonitorOptions, snapshot: Snapshot, now: number, historical?: UsageSummary, status?: HistoryStatus, prices: PriceBook = defaultPrices): DashboardData {
+  /** 只有可见面板构造详情；保留旧快照参数兼容调用方，读数统一按 now 重算以保证模型守恒。 */
+  data(sessions: Session[], options: MonitorOptions, _previousSnapshot: Snapshot, now: number, historical?: UsageSummary, status?: HistoryStatus, prices: PriceBook = defaultPrices): DashboardData {
     const frame = calculateFrame(sessions, options, now, true);
     const selected = sessions.filter(session => options.scope === 'all' || inWorkspace(session.cwd, options.workspaces));
     const grouped = new Map<string, Session[]>();
@@ -88,9 +95,11 @@ export class DashboardHistory {
     const duration = timed.reduce((sum, sample) => sum + sampleDuration(sample), 0);
     const points = frame.points;
     // 峰值采用每秒桶的三秒平均，并包含当前窗口读数，估算会随完成记录一起校正。
-    let previous1 = 0, previous2 = 0, peak = snapshot.rate;
+    let previous1 = 0, previous2 = 0, peak = frame.snapshot.rate;
     for (const point of points) { peak = Math.max(peak, (previous2 + previous1 + point.rate) / 3); previous2 = previous1; previous1 = point.rate; }
-    return { now, snapshot, points, sessions: rows.sort((a, b) => Number(b.phase !== 'idle') - Number(a.phase !== 'idle') || b.lastEvent - a.lastEvent),
+    // 仪表盘采用同一时钟重新计算的快照，避免上一轮状态栏快照与模型合计相差一次刷新。
+    return { now, snapshot: frame.snapshot, points, quota: summarizeQuota(sessions, now), latency: summarizeLatency(sessions, options.scope, options.workspaces, now), models: frame.models,
+      sessions: rows.sort((a, b) => Number(b.phase !== 'idle') - Number(a.phase !== 'idle') || b.lastEvent - a.lastEvent),
       usage: { input: historical?.input ?? samples.reduce((sum, sample) => sum + sample.input, 0), output: historical?.output ?? samples.reduce((sum, sample) => sum + sample.output, 0),
         responses: historical?.responses ?? samples.length, average: historical?.average ?? (duration ? timed.reduce((sum, sample) => sum + sample.output, 0) * 1000 / duration : 0),
         peak, range: historical?.range ?? '30m', from: historical?.from ?? now - 1800000, timeZone: historical?.timeZone ?? 'UTC' },
